@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
@@ -56,6 +58,7 @@ class Question(models.Model):
         LONGTEXT = 'tl', _("long text")
         SINGLE_SELECT = 'ss', _("select one")
         MULTIPLE_SELECT = 'ms', _("select multiple")
+        DATETIME = 'dt', _("date + time")
 
     ANSWER_TYPE_TYPES = {
         AnswerType.BOOLEAN_CHECKBOX: bool,
@@ -67,6 +70,7 @@ class Question(models.Model):
         AnswerType.LONGTEXT: str,
         AnswerType.SINGLE_SELECT: str,
         AnswerType.MULTIPLE_SELECT: list,
+        AnswerType.DATETIME: datetime,
     }
 
     tournament = models.ForeignKey('tournaments.Tournament', models.CASCADE,
