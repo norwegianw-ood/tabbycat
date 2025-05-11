@@ -41,6 +41,8 @@ OPTIONS_TO_CONFIG_MAPPING = {
     "assignment_method"     : "draw_rules__bp_assignment_method",
     "renyi_order"           : "draw_rules__bp_renyi_order",
     "exponent"              : "draw_rules__bp_position_cost_exponent",
+    "max_times_on_one_side" : "draw_rules__max_times_per_side",
+    "pullup_penalty"        : "draw_rules__draw_pullup_penalty",
 }
 
 
@@ -245,6 +247,7 @@ class PowerPairedDrawManager(BaseDrawManager):
             options.extend([
                 "avoid_conflicts", "odd_bracket", "pairing_method",
                 "pullup_restriction", "side_allocations",
+                "max_times_on_one_side", "pullup_penalty",
             ])
         elif self.teams_in_debate == 4:
             options.extend(["pullup", "position_cost", "assignment_method", "renyi_order", "exponent"])

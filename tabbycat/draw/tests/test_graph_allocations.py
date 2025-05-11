@@ -120,7 +120,7 @@ class TestPowerPairedDrawGeneratorParts(unittest.TestCase):
                 self.assertEqual(GraphCostMixin._pairings_fold_top_adjacent_rest([teams[3], team], 8, bracket=i), expected)
 
     def test_add_pullup_penalty(self):
-        teams = [TestTeam(i+1, chr(ord('A') + i), subrank=i+1, pullup_debates=i+1) for i in range(2)]
+        teams = [TestTeam(i+1, chr(ord('A') + i), points=i, subrank=i+1, pullup_debates=i+1) for i in range(2)]
         gcm = GraphPowerPairedDrawGenerator(teams)
         gcm.options = {'pullup_debates_penalty': 1, 'pairing_method': 'random', 'avoid_history': False, 'avoid_institution': False, 'side_allocations': False}
         gcm.team_flags = {teams[0]: ['pullup']}

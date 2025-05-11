@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from typing import TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 import munkres
 import networkx as nx
@@ -8,7 +8,6 @@ from ..types import DebateSide
 
 if TYPE_CHECKING:
     from participants.models import Team
-    from typing import Optional
 
 
 def sign(n: int) -> int:
@@ -39,10 +38,6 @@ class GraphGeneratorMixin:
             t1_affs, t1_negs = t1.side_history
             t2_affs, t2_negs = t2.side_history
 
-            if self.options["max_times_on_one_side"] > 0:
-                if max(t1_affs, t1_negs, t2_affs, t1_negs) > self.options["max_times_on_one_side"]:
-                    return None
-
             # Only declare an imbalance if both sides have been on the same side more often
             # Affs are positive, negs are negative. If teams have opposite signs, negative imbalance
             # gets reduced to 0. Equalities have no restriction on the side to be allocated so
@@ -53,6 +48,11 @@ class GraphGeneratorMixin:
             # This would prefer an imbalance of (+5 - +1) becoming (+4 - +2) rather than
             # (+5 - +4) becoming (+4 - +5), in a severe case.
             magnitude = (abs(t1_affs - t1_negs) + abs(t2_affs - t2_negs)) // 2
+
+            if self.options["max_times_on_one_side"] > 0:
+                if (imbalance * magnitude) >= self.options["max_times_on_one_side"]:
+                    return None
+
             penalty += imbalance * magnitude * self.options["side_penalty"]
 
         return penalty
@@ -69,8 +69,8 @@ class GraphGeneratorMixin:
             pairings[points] = []
             graph = nx.Graph()
             n_teams = self.get_n_teams(teams)
-            for t1 in teams:
-                for t2 in teams:
+            for k, t1 in enumerate(teams):
+                for t2 in teams[k+1:]:
                     penalty = self.assignment_cost(t1, t2, n_teams, j)
                     if penalty is not None:
                         graph.add_edge(t1, t2, weight=penalty)

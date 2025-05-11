@@ -1068,6 +1068,8 @@ class DrawGenerationSerializer(serializers.Serializer):
         assignment_method = serializers.ChoiceField(choices=BPAssignmentMethod.choices, required=False, help_text=BPAssignmentMethod.help_text)
         renyi_order = serializers.FloatField(required=False)
         exponent = serializers.FloatField(required=False)
+        max_times_on_one_side = serializers.IntegerField(min_value=0, required=False)
+        pullup_penalty = serializers.IntegerField(min_value=0, required=False)
 
     draw_type = serializers.ChoiceField(choices=Round.DrawType.choices, required=False, help_text=Round._meta.get_field('draw_type').help_text)
     options = OptionsSerializer(required=False, help_text="Options for draw generation; defaults to tournament preferences")

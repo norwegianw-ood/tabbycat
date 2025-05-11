@@ -236,7 +236,6 @@ class DrawOddBracket(ChoicePreference):
     section = draw_rules
     name = 'draw_odd_bracket'
     choices = (
-        ('pullup_lowest_ds_rank', _("Pull up from the lowest draw strength by rank")),
         ('pullup_top', _("Pull up from top")),
         ('pullup_bottom', _("Pull up from bottom")),
         ('pullup_middle', _("Pull up from middle")),
@@ -245,6 +244,8 @@ class DrawOddBracket(ChoicePreference):
         ('intermediate_bubble_up_down', _("Intermediate brackets with bubble-up-bubble-down")),
         ('intermediate1', _("Intermediate 1 (pre-allocated sides)")),
         ('intermediate2', _("Intermediate 2 (pre-allocated sides)")),
+        ('pullup_lowest_ds_rank', _("Pull up from the lowest draw strength by rank")),
+        ('pullup_lowest_ds_rank_npulls', _("Pull up from the least pulled up, then the lowest draw strength by rank")),
     )
     default = 'intermediate_bubble_up_down'
 
@@ -290,7 +291,8 @@ class DrawAvoidConflicts(ChoicePreference):
     choices = (
         ('off', _("Off")),
         ('one_up_one_down', _("One-up-one-down")),
-        ('graph', _("Minimum cost matching")),
+        ('graph', _("Minimum cost matching (pullups determined beforehand)")),
+        ('graph_one', _("Minimum cost matching (including pullups)")),
     )
     default = 'one_up_one_down'
 
@@ -439,6 +441,17 @@ class ByeTeamSelection(ChoicePreference):
         ('lowest', _("Choose lowest ranking teams")),
     )
     default = 'off'
+
+
+@tournament_preferences_registry.register
+class MaximumSideImbalance(IntegerPreference):
+    help_text = _("A limit for the side imbalance, where a pairing will not be made if "
+        "the imbalance will be too great. For use with the graph generator, with 0 as disabled.")
+    verbose_name = _("Maximum allowed side imbalance")
+    section = draw_rules
+    name = 'max_times_on_one_side'
+    default = 0
+    field_kwargs = {'validators': [MinValueValidator(0)]}
 
 
 # ==============================================================================
