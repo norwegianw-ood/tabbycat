@@ -11,6 +11,7 @@ from formtools.wizard.views import SessionWizardView
 
 from actionlog.mixins import LogActionMixin
 from actionlog.models import ActionLogEntry
+from participants.emoji import EMOJI_NAMES
 from participants.models import Coach, Speaker, TournamentInstitution
 from privateurls.utils import populate_url_keys
 from tournaments.mixins import PublicTournamentPageMixin, TournamentMixin
@@ -99,6 +100,19 @@ class BaseCreateTeamFormView(LogActionMixin, PublicTournamentPageMixin, CustomQu
     public_page_preference = 'open_team_registration'
     action_log_type = ActionLogEntry.ActionType.TEAM_REGISTER
 
+    REFERENCE_GENERATORS = {
+        'user': '_custom_reference',
+        'alphabetical': '_alphabetical_reference',
+        'numerical': '_numerical_reference',
+        'initials': '_initials_reference',
+    }
+
+    CODE_NAME_GENERATORS = {
+        'user': '_custom_code_name',
+        'emoji': '_emoji_code_name',
+        'last_names': '_last_names_code_name',
+    }
+
     def get_page_title(self):
         match self.steps.current:
             case 'team':
@@ -117,6 +131,7 @@ class BaseCreateTeamFormView(LogActionMixin, PublicTournamentPageMixin, CustomQu
                 team = team_form.instance
                 team.tournament = self.tournament
                 team.institution = self.institution
+                team.reference = getattr(self, self.REFERENCE_GENERATORS[self.tournament.pref('team_name_generator')])(team, [])
                 return _("for %s") % team._construct_short_name()
         return ''
 
@@ -141,6 +156,11 @@ class BaseCreateTeamFormView(LogActionMixin, PublicTournamentPageMixin, CustomQu
         return form
 
     def done(self, form_list, form_dict, **kwargs):
+        if self.tournament.pref('team_name_generator') != 'user':
+            reference = getattr(self, self.REFERENCE_GENERATORS[self.tournament.pref('team_name_generator')])(form_dict['team'].instance, form_dict['speaker'])
+            form_dict['team'].instance.reference = reference
+
+        form_dict['team'].instance.code_name = getattr(self, self.CODE_NAME_GENERATORS[self.tournament.pref('code_name_generator')])(form_dict['team'].instance, form_dict['speaker'])
         team = form_dict['team'].save()
         self.object = team
 
@@ -151,6 +171,43 @@ class BaseCreateTeamFormView(LogActionMixin, PublicTournamentPageMixin, CustomQu
         messages.success(self.request, _("Your team %s has been registered!") % team.short_name)
         self.log_action()
         return HttpResponseRedirect(self.get_success_url())
+
+    def _alphabetical_reference(self, team, speakers=None):
+        teams = self.tournament.team_set.filter(institution=self.institution, reference__regex=r"^[A-Z]+$").values_list('reference', flat=True)
+        team_numbers = []
+        for existing_team in teams:
+            n = 0
+            for char in existing_team:
+                n = n*26 + (ord(char) - 64)
+            team_numbers.append(n)
+
+        ch = ''
+        mx = max(team_numbers) + 1
+        while mx > 0:
+            ch = chr(mx % 26 + 64) + ch
+            mx //= 26
+
+        return ch
+
+    def _numerical_reference(self, team, speakers=None):
+        teams = self.tournament.team_set.filter(institution=self.institution, reference__regex=r"^\d+$").values_list('reference', flat=True)
+        team_numbers = [int(t) for t in teams]
+        return str(max(team_numbers) + 1)
+
+    def _initials_reference(self, team, speakers):
+        return "".join(s.instance.last_name[0] for s in speakers)
+
+    def _custom_reference(self, team, speakers=None):
+        return team.reference
+
+    def _custom_code_name(self, team, speakers=None):
+        return team.code_name
+
+    def _emoji_code_name(self, team, speakers=None):
+        return EMOJI_NAMES[team.emoji]
+
+    def _last_names_code_name(self, team, speakers=None):
+        return ' & '.join(s.instance.last_name for s in speakers)
 
 
 class BaseCreateAdjudicatorFormView(LogActionMixin, PublicTournamentPageMixin, CustomQuestionFormMixin, CreateView):
