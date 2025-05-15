@@ -74,6 +74,15 @@ urlpatterns = [
                         name='api-score-criteria-detail'),
                 ])),
 
+                path('/questions', include([
+                    path('',
+                        views.QuestionViewSet.as_view(list_methods),
+                        name='api-question-list'),
+                    path('/<int:pk>',
+                        views.QuestionViewSet.as_view(detail_methods),
+                        name='api-question-detail'),
+                ])),
+
                 path('/rounds', include([
                     path('',
                         views.RoundViewSet.as_view(list_methods),
@@ -245,6 +254,10 @@ urlpatterns = [
                         views.GroupViewSet.as_view(detail_methods),
                         name='api-group-detail'),
                 ])),
+
+                path('/me',
+                    views.ParticipantIdentificationView.as_view({'get': 'retrieve'}),
+                    name='api-tournament-detail'),
 
                 path('/', include(pref_router.urls)),  # Preferences
             ])),

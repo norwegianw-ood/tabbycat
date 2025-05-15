@@ -7,10 +7,12 @@ from django.utils.encoding import uri_to_iri
 from drf_spectacular.utils import extend_schema_field
 from rest_framework.relations import Hyperlink, HyperlinkedIdentityField, HyperlinkedRelatedField, SlugRelatedField
 from rest_framework.reverse import reverse
-from rest_framework.serializers import CharField, Field, IntegerField
+from rest_framework.serializers import CharField, Field, IntegerField, Serializer, ValidationError
 
+from adjfeedback.models import AdjudicatorFeedbackQuestion
 from draw.types import DebateSide
 from participants.models import Adjudicator, Speaker, Team
+from registration.models import Question
 from venues.models import Venue
 
 from .utils import is_staff
@@ -271,6 +273,12 @@ class BaseSourceField(TournamentHyperlinkedRelatedField):
         except self.model.DoesNotExist:
             self.fail('does_not_exist')
 
+    def get_url_options(self, value, format):
+        for view_name, (model, field) in self.models.items():
+            obj = getattr(value, model.__name__.lower(), None)
+            if obj is not None:
+                return self.get_url(obj, view_name, self.context['request'], format)
+
 
 class ParticipantSourceField(BaseSourceField):
     field_source_name = 'participant_submitter'
@@ -323,3 +331,37 @@ class SideChoiceField(IntegerField):
             if t.pref('teams_in_debate') == 4:
                 return ['og', 'oo', 'cg', 'co'][value]
         return int(value)
+
+
+class AnswerSerializer(Serializer):
+    question = TournamentHyperlinkedRelatedField(
+        view_name='api-question-detail',
+        queryset=Question.objects.all(),
+    )
+    answer = AnyField()
+
+    def validate(self, data):
+        # Convert answer to correct type
+        typ = Question.ANSWER_TYPE_TYPES[data['question'].answer_type]
+        if type(data['answer']) != typ:
+            raise ValidationError({'answer': 'The answer must be of type %s' % typ.__name__})
+
+        data['answer'] = typ(data['answer'])
+
+        option_error = ValidationError({'answer': 'Answer must be in set of options'})
+        if len(data['question'].choices) > 0:
+            if typ is list and len(set(data['answer']) - set(data['question'].choices)) > 0:
+                raise option_error
+            if data['answer'] not in data['question'].choices:
+                raise option_error
+        if (data['question'].min_value is not None and data['answer'] < data['question'].min_value) or (data['question'].max_value is not None and data['answer'] > data['question'].max_value):
+            raise option_error
+
+        return super().validate(data)
+
+
+class AdjAnswerSerializer(AnswerSerializer):
+    question = TournamentHyperlinkedRelatedField(
+        view_name='api-feedbackquestion-detail',
+        queryset=AdjudicatorFeedbackQuestion.objects.all(),
+    )
