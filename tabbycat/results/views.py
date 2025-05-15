@@ -964,7 +964,7 @@ class BaseMergeLatestBallotsView(BaseNewBallotSetView):
         criteria = ScoreCriterion.objects.filter(tournament=self.tournament)
         self.result = DebateResult(self.ballotsub, tournament=self.tournament, criteria=criteria)
         self.errors = self.result.populate_from_merge(*[b.result for b in bses]) if prefill else []
-        self.vetos = None
+        self.vetos = {}
 
         if prefill:
             # Handle motion conflicts
