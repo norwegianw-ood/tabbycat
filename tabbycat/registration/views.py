@@ -301,7 +301,7 @@ class TeamRegistrationTableView(TournamentMixin, AdministratorMixin, VueTableTem
         ).all()
         spk_questions = self.tournament.question_set.filter(for_content_type=ContentType.objects.get_for_model(Speaker)).order_by('seq')
 
-        table = TabbycatTableBuilder(view=self, title=_('Responses'), sort_key='name')
+        table = TabbycatTableBuilder(view=self, title=_('Responses'), sort_key='team')
         table.add_team_columns(teams)
 
         handle_question_columns(table, teams)
