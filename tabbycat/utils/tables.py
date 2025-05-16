@@ -242,7 +242,8 @@ class TabbycatTableBuilder(BaseTableBuilder):
             return escape(team.long_name)
 
     def _adjudicator_record_link(self, adj, suffix=""):
-        adj_short_name = adj.get_public_name(self.tournament).split(" ")[0]
+        unredact = self.admin and has_permission(self.user, Permission.VIEW_ANONYMOUS, self.tournament)
+        adj_short_name = (adj.name if unredact else adj.get_public_name(self.tournament)).split(" ")[0]
         if self.admin:
             return {
                 'text': _("View %(a)s's %(d)s Record") % {'a': escape_if_unsafe(adj_short_name), 'd': suffix},
@@ -499,11 +500,12 @@ class TabbycatTableBuilder(BaseTableBuilder):
             show_metadata=True, subtext=None):
 
         adj_data = []
+        unredact = self.admin and has_permission(self.user, Permission.VIEW_ANONYMOUS, self.tournament)
         for adj in adjudicators:
-            if adj.anonymous and not (self.admin and has_permission(self.user, Permission.VIEW_ANONYMOUS, self.tournament)):
+            if adj.anonymous and not unredact:
                 adj_data.append(self.REDACTED_CELL)
             else:
-                cell = {'text': escape_if_unsafe(adj.get_public_name(self.tournament))}
+                cell = {'text': escape_if_unsafe(adj.name if unredact else adj.get_public_name(self.tournament))}
                 if adj.anonymous:
                     cell['class'] = 'admin-redacted'
                 if self._show_record_links:
@@ -670,13 +672,14 @@ class TabbycatTableBuilder(BaseTableBuilder):
 
     def add_speaker_columns(self, speakers, categories=True):
         speaker_data = []
+        unredact = self.admin and has_permission(self.user, Permission.VIEW_ANONYMOUS, self.tournament)
         for speaker in speakers:
             anonymous = getattr(speaker, 'anonymise', False) or speaker.anonymous
-            if anonymous and not (self.admin and has_permission(self.user, Permission.VIEW_ANONYMOUS, self.tournament)):
+            if anonymous and not unredact:
                 speaker_data.append(self.REDACTED_CELL)
             else:
                 cell = {
-                    'text': escape_if_unsafe(speaker.get_public_name(self.tournament)),
+                    'text': escape_if_unsafe(speaker.name if unredact else speaker.get_public_name(self.tournament)),
                     'class': 'no-wrap' if len(speaker.get_public_name(self.tournament)) < 20 else '',
                 }
                 if anonymous:
