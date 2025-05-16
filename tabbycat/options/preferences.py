@@ -448,7 +448,7 @@ class ByeTeamSelection(ChoicePreference):
 @tournament_preferences_registry.register
 class MaximumSideImbalance(IntegerPreference):
     help_text = _("A limit for the side imbalance, where a pairing will not be made if "
-        "the imbalance will be too great. For use with the graph generator, with 0 as disabled.")
+        "that requires a team to debate more times on one side than the selected number. For use with the graph generator, with 0 as disabled.")
     verbose_name = _("Maximum allowed side imbalance")
     section = draw_rules
     name = 'max_times_on_one_side'
