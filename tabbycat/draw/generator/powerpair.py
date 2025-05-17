@@ -1,6 +1,7 @@
 import random
 from collections import OrderedDict
 from itertools import groupby
+from operator import attrgetter
 from typing import Optional, TYPE_CHECKING
 
 from django.utils.translation import gettext as _
@@ -485,16 +486,21 @@ class SingleGraphPowerPairedDrawGenerator(GraphCostMixin, GraphGeneratorMixin, B
             if is_pullup > 1:  # Don't allow pulling up more than one bracket
                 return None
 
-            pullup_team = min([t1, t2], key=lambda t: t.points)  # Include penalty for the pulled up team
+            pullup_team = min([t1, t2], key=attrgetter('points'))  # Include penalty for the pulled up team
             penalty += pullup_team.pullup_magnitude
         return penalty
 
     def annotate_team_pullup_precedence(self, teams):
         sort_function = self.get_option_function("odd_bracket", self.ODD_BRACKET_FUNCTIONS)
 
-        for n_points, bracket_group in groupby(teams, key=lambda t: t.points):
+        for n_points, bracket_group in groupby(teams, key=attrgetter('points')):
             bracket = list(bracket_group)
-            for i, team in enumerate(sorted(bracket, key=lambda t: sort_function(t, size=len(bracket))), start=1):
+            i = 1
+            current_cost = 0
+            for team in sorted(bracket, key=lambda t: sort_function(t, size=len(bracket))):
+                if (new_cost := sort_function(team, size=len(bracket))) != current_cost:
+                    current_cost = new_cost
+                    i += 1
                 team.pullup_magnitude = i * self.options['pullup_penalty']
 
     # Pullup penalty methods
@@ -512,7 +518,7 @@ class SingleGraphPowerPairedDrawGenerator(GraphCostMixin, GraphGeneratorMixin, B
 
     @staticmethod
     def _pullup_random(team, size=None):
-        return random.random()
+        return 0
 
     @staticmethod
     def _pullup_lowest_ds_rank(team, size=None):
