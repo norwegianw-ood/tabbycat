@@ -254,6 +254,7 @@ def handle_question_columns(table: TabbycatTableBuilder, objects, questions=None
 class InstitutionRegistrationTableView(TournamentMixin, AdministratorMixin, VueTableTemplateView):
     page_emoji = '🏫'
     page_title = gettext_lazy("Institutional Registration")
+    template_name = 'answer_tables/institutions.html'
 
     view_permission = Permission.VIEW_REGISTRATION
 
@@ -285,6 +286,7 @@ class InstitutionRegistrationTableView(TournamentMixin, AdministratorMixin, VueT
 class TeamRegistrationTableView(TournamentMixin, AdministratorMixin, VueTableTemplateView):
     page_emoji = '👯'
     page_title = gettext_lazy("Team Registration")
+    template_name = 'answer_tables/teams.html'
 
     view_permission = Permission.VIEW_REGISTRATION
 
@@ -318,6 +320,7 @@ class TeamRegistrationTableView(TournamentMixin, AdministratorMixin, VueTableTem
 class AdjudicatorRegistrationTableView(TournamentMixin, AdministratorMixin, VueTableTemplateView):
     page_emoji = '👂'
     page_title = gettext_lazy("Adjudicator Registration")
+    template_name = 'answer_tables/adjudicators.html'
 
     view_permission = Permission.VIEW_REGISTRATION
 
@@ -338,9 +341,10 @@ class CustomQuestionFormsetView(TournamentMixin, AdministratorMixin, ModelFormSe
     formset_factory_kwargs = {
         'fields': ['name', 'text', 'help_text', 'answer_type', 'required', 'min_value', 'max_value', 'choices'],
         'field_classes': {'choices': SimpleArrayField},
+        'extra': 3,
     }
     question_model = None
-    template_name = 'venue_categories_edit.html'
+    template_name = 'questions_edit.html'
 
     view_permission = True
     edit_permission = Permission.EDIT_QUESTIONS
@@ -353,3 +357,23 @@ class CustomQuestionFormsetView(TournamentMixin, AdministratorMixin, ModelFormSe
 
     def get_formset_queryset(self):
         return super().get_formset_queryset().filter(for_content_type=ContentType.objects.get_for_model(self.question_model)).order_by('seq')
+
+    def formset_valid(self, formset):
+        self.instances = formset.save(commit=False)
+        if self.instances:
+            for i, question in enumerate(self.instances, start=1):
+                question.tournament = self.tournament
+                question.for_content_type = ContentType.objects.get_for_model(self.question_model)
+                question.seq = i
+                question.save()
+
+            messages.success(self.request, _("Questions for %(model)s were successfully saved.") % {'model': self.question_model._meta.verbose_name_plural})
+        else:
+            messages.success(self.request, _("No changes were made to the questions."))
+
+        if "add_more" in self.request.POST:
+            return HttpResponseRedirect(self.request.path_info)
+        return super().formset_valid(formset)
+
+    def get_success_url(self, *args, **kwargs):
+        return reverse_tournament(self.success_url, self.tournament)
