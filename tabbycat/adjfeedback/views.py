@@ -18,6 +18,7 @@ from options.utils import use_team_code_names, use_team_code_names_data_entry
 from participants.models import Adjudicator, Speaker, Team
 from participants.prefetch import populate_feedback_scores
 from participants.templatetags.team_name_for_data_entry import team_name_for_data_entry
+from registration.views import CustomQuestionFormsetView
 from results.mixins import PublicSubmissionFieldsMixin, TabroomSubmissionFieldsMixin
 from results.prefetch import populate_wins_for_debateteams
 from tournaments.mixins import (PersonalizablePublicTournamentPageMixin, PublicTournamentPageMixin, SingleObjectByRandomisedUrlMixin,
@@ -823,6 +824,23 @@ class UpdateAdjudicatorScoresView(AdministratorMixin, LogActionMixin, Tournament
             nupdated) % {'count': nupdated})
         self.log_action()
         return super().form_valid(form)
+
+
+class AdjFeedbackQuestionsFormset(CustomQuestionFormsetView):
+    formset_model = AdjudicatorFeedbackQuestion
+    formset_factory_kwargs = {
+        'fields': [
+            'name', 'reference', 'from_adj', 'from_team',
+            'text', 'help_text', 'answer_type', 'required', 'min_value', 'max_value', 'choices',
+        ],
+    }
+    question_model = AdjudicatorFeedback
+
+    page_emoji = '❓'
+    page_title = gettext_lazy("Custom Feedback Questions")
+
+    def get_page_subtitle(self):
+        return ''
 
 
 # ==============================================================================

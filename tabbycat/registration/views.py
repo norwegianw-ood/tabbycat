@@ -11,6 +11,7 @@ from formtools.wizard.views import SessionWizardView
 
 from actionlog.mixins import LogActionMixin
 from actionlog.models import ActionLogEntry
+from participants.emoji import EMOJI_NAMES
 from participants.models import Coach, Speaker, TournamentInstitution
 from privateurls.utils import populate_url_keys
 from tournaments.mixins import PublicTournamentPageMixin, TournamentMixin
@@ -99,6 +100,19 @@ class BaseCreateTeamFormView(LogActionMixin, PublicTournamentPageMixin, CustomQu
     public_page_preference = 'open_team_registration'
     action_log_type = ActionLogEntry.ActionType.TEAM_REGISTER
 
+    REFERENCE_GENERATORS = {
+        'user': '_custom_reference',
+        'alphabetical': '_alphabetical_reference',
+        'numerical': '_numerical_reference',
+        'initials': '_initials_reference',
+    }
+
+    CODE_NAME_GENERATORS = {
+        'user': '_custom_code_name',
+        'emoji': '_emoji_code_name',
+        'last_names': '_last_names_code_name',
+    }
+
     def get_page_title(self):
         match self.steps.current:
             case 'team':
@@ -117,6 +131,7 @@ class BaseCreateTeamFormView(LogActionMixin, PublicTournamentPageMixin, CustomQu
                 team = team_form.instance
                 team.tournament = self.tournament
                 team.institution = self.institution
+                team.reference = getattr(self, self.REFERENCE_GENERATORS[self.tournament.pref('team_name_generator')])(team, [])
                 return _("for %s") % team._construct_short_name()
         return ''
 
@@ -141,6 +156,11 @@ class BaseCreateTeamFormView(LogActionMixin, PublicTournamentPageMixin, CustomQu
         return form
 
     def done(self, form_list, form_dict, **kwargs):
+        if self.tournament.pref('team_name_generator') != 'user':
+            reference = getattr(self, self.REFERENCE_GENERATORS[self.tournament.pref('team_name_generator')])(form_dict['team'].instance, form_dict['speaker'])
+            form_dict['team'].instance.reference = reference
+
+        form_dict['team'].instance.code_name = getattr(self, self.CODE_NAME_GENERATORS[self.tournament.pref('code_name_generator')])(form_dict['team'].instance, form_dict['speaker'])
         team = form_dict['team'].save()
         self.object = team
 
@@ -151,6 +171,43 @@ class BaseCreateTeamFormView(LogActionMixin, PublicTournamentPageMixin, CustomQu
         messages.success(self.request, _("Your team %s has been registered!") % team.short_name)
         self.log_action()
         return HttpResponseRedirect(self.get_success_url())
+
+    def _alphabetical_reference(self, team, speakers=None):
+        teams = self.tournament.team_set.filter(institution=self.institution, reference__regex=r"^[A-Z]+$").values_list('reference', flat=True)
+        team_numbers = []
+        for existing_team in teams:
+            n = 0
+            for char in existing_team:
+                n = n*26 + (ord(char) - 64)
+            team_numbers.append(n)
+
+        ch = ''
+        mx = max(team_numbers) + 1
+        while mx > 0:
+            ch = chr(mx % 26 + 64) + ch
+            mx //= 26
+
+        return ch
+
+    def _numerical_reference(self, team, speakers=None):
+        teams = self.tournament.team_set.filter(institution=self.institution, reference__regex=r"^\d+$").values_list('reference', flat=True)
+        team_numbers = [int(t) for t in teams]
+        return str(max(team_numbers) + 1)
+
+    def _initials_reference(self, team, speakers):
+        return "".join(s.instance.last_name[0] for s in speakers)
+
+    def _custom_reference(self, team, speakers=None):
+        return team.reference
+
+    def _custom_code_name(self, team, speakers=None):
+        return team.code_name
+
+    def _emoji_code_name(self, team, speakers=None):
+        return EMOJI_NAMES[team.emoji]
+
+    def _last_names_code_name(self, team, speakers=None):
+        return ' & '.join(s.instance.last_name for s in speakers)
 
 
 class BaseCreateAdjudicatorFormView(LogActionMixin, PublicTournamentPageMixin, CustomQuestionFormMixin, CreateView):
@@ -254,6 +311,7 @@ def handle_question_columns(table: TabbycatTableBuilder, objects, questions=None
 class InstitutionRegistrationTableView(TournamentMixin, AdministratorMixin, VueTableTemplateView):
     page_emoji = '🏫'
     page_title = gettext_lazy("Institutional Registration")
+    template_name = 'answer_tables/institutions.html'
 
     view_permission = Permission.VIEW_REGISTRATION
 
@@ -285,6 +343,7 @@ class InstitutionRegistrationTableView(TournamentMixin, AdministratorMixin, VueT
 class TeamRegistrationTableView(TournamentMixin, AdministratorMixin, VueTableTemplateView):
     page_emoji = '👯'
     page_title = gettext_lazy("Team Registration")
+    template_name = 'answer_tables/teams.html'
 
     view_permission = Permission.VIEW_REGISTRATION
 
@@ -318,6 +377,7 @@ class TeamRegistrationTableView(TournamentMixin, AdministratorMixin, VueTableTem
 class AdjudicatorRegistrationTableView(TournamentMixin, AdministratorMixin, VueTableTemplateView):
     page_emoji = '👂'
     page_title = gettext_lazy("Adjudicator Registration")
+    template_name = 'answer_tables/adjudicators.html'
 
     view_permission = Permission.VIEW_REGISTRATION
 
@@ -338,9 +398,10 @@ class CustomQuestionFormsetView(TournamentMixin, AdministratorMixin, ModelFormSe
     formset_factory_kwargs = {
         'fields': ['name', 'text', 'help_text', 'answer_type', 'required', 'min_value', 'max_value', 'choices'],
         'field_classes': {'choices': SimpleArrayField},
+        'extra': 3,
     }
     question_model = None
-    template_name = 'venue_categories_edit.html'
+    template_name = 'questions_edit.html'
 
     view_permission = True
     edit_permission = Permission.EDIT_QUESTIONS
@@ -353,3 +414,23 @@ class CustomQuestionFormsetView(TournamentMixin, AdministratorMixin, ModelFormSe
 
     def get_formset_queryset(self):
         return super().get_formset_queryset().filter(for_content_type=ContentType.objects.get_for_model(self.question_model)).order_by('seq')
+
+    def formset_valid(self, formset):
+        self.instances = formset.save(commit=False)
+        if self.instances:
+            for i, question in enumerate(self.instances, start=1):
+                question.tournament = self.tournament
+                question.for_content_type = ContentType.objects.get_for_model(self.question_model)
+                question.seq = i
+                question.save()
+
+            messages.success(self.request, _("Questions for %(model)s were successfully saved.") % {'model': self.question_model._meta.verbose_name_plural})
+        else:
+            messages.success(self.request, _("No changes were made to the questions."))
+
+        if "add_more" in self.request.POST:
+            return HttpResponseRedirect(self.request.path_info)
+        return super().formset_valid(formset)
+
+    def get_success_url(self, *args, **kwargs):
+        return reverse_tournament(self.success_url, self.tournament)

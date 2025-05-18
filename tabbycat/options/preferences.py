@@ -1592,14 +1592,13 @@ class AutomaticTeamName(ChoicePreference):
 
 @tournament_preferences_registry.register
 class TeamRegistrationFields(MultipleChoicePreference):
-    help_text = _("Which fields should teams be allowed to submit")
+    help_text = _("Which fields should teams be allowed to submit, in addition to fields with handling through other settings.")
     verbose_name = _("Customizable team fields")
     section = registration
     name = 'reg_team_fields'
     default = ('use_institution_prefix', 'emoji')
     choices = (
         ('use_institution_prefix', _('Prefix name with institution')),
-        ('code_name', _("Code name")),
         ('break_categories', _("Break categories")),
         ('seed', _("Seed")),
         ('emoji', _("Emoji")),
@@ -1609,7 +1608,7 @@ class TeamRegistrationFields(MultipleChoicePreference):
 
 @tournament_preferences_registry.register
 class SpeakerRegistrationFields(MultipleChoicePreference):
-    help_text = _("Which fields should speakers be allowed to submit")
+    help_text = _("Which fields should speakers submit, in addition to fields with handling through other settings.")
     verbose_name = _("Customizable speaker fields")
     section = registration
     name = 'reg_speaker_fields'
@@ -1681,3 +1680,17 @@ class EnableOpenAdjRegistration(BooleanPreference):
     section = registration
     name = 'open_adj_registration'
     default = False
+
+
+@tournament_preferences_registry.register
+class CodeNameGenerator(ChoicePreference):
+    help_text = _("If using code names, how should they be generated")
+    verbose_name = _("Code name standard")
+    section = registration
+    name = 'code_name_generator'
+    choices = (
+        ('user', _("Assigned by user")),
+        ('emoji', _("Emojis")),
+        ('last_names', _("Last names (e.g. 'Jones & Smith')")),
+    )
+    default = 'emoji'

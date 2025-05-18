@@ -188,7 +188,10 @@
       <a class="list-group-item" href="{% tournamenturl 'adjfeedback-progress' %}" data-parent="#feedh">
         <i data-feather="x-circle"></i>{% trans "Unsubmitted" %}
       </a>
-      <a class="list-group-item" href="{% tournamenturl 'adjfeedback-add-index' %}">
+      <a class="list-group-item" href="{% tournamenturl 'adjfeedback-edit-questions' %}" data-parent="#feedh">
+        <i data-feather="paperclip"></i>{% trans "Feedback Questions" %}
+      </a>
+      <a class="list-group-item" href="{% tournamenturl 'adjfeedback-add-index' %}" data-parent="#feedh">
         <i data-feather="plus-circle"></i>{% trans "Add Feedback" %}
       </a>
       <a class="list-group-item" href="{% tournamenturl 'adjfeedback-update-scores-bulk' %}">

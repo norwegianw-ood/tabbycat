@@ -1,3 +1,5 @@
+import random
+
 from django import forms
 from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
@@ -67,19 +69,28 @@ class TeamForm(CustomQuestionsFormMixin, forms.ModelForm):
         self.institution = institution
         super().__init__(*args, **kwargs)
 
-        for field in {'use_institution_prefix', 'code_name', 'break_categories', 'seed', 'emoji'} - set(self.tournament.pref('reg_team_fields')):
-            self.fields.pop(field)
+        self.fields['tournament'].initial = self.tournament
 
-        if self.tournament.pref('team_name_generator') != 'user':
+        use_inst_field = self.fields['use_institution_prefix']
+        use_inst_field.initial = bool(self.institution)
+
+        if self.tournament.pref('team_name_generator') != 'user' and self.institution:
             self.fields.pop('reference')
+
+        if not self.institution or 'use_institution_prefix' not in self.tournament.pref('reg_team_fields') or self.tournament.pref('team_name_generator') != 'user':
+            use_inst_field.widget = forms.HiddenInput()
+
+        for field in {'code_name', 'break_categories', 'seed', 'emoji'} - set(self.tournament.pref('reg_team_fields')):
+            self.fields.pop(field)
 
         if self.institution is not None:
             self.fields['institution'].widget = forms.HiddenInput()
-            self.fields['institution'].initial = self.tournament
+            self.fields['institution'].initial = self.institution
 
         if 'emoji' in self.fields:
             used_emoji = self.tournament.team_set.filter(emoji__isnull=False).values_list('emoji', flat=True)
             self.fields['emoji'].choices = [e for e in EMOJI_RANDOM_FIELD_CHOICES if e[0] not in used_emoji]
+            self.fields['emoji'].initial = random.choice(self.fields['emoji'].choices)[0]
 
         if 'seed' in self.fields and self.tournament.pref('show_seed_in_importer') == 'title':
             self.fields['seed'] = forms.ChoiceField(required=False, label=self.fields['seed'].label, choices=(
@@ -93,11 +104,20 @@ class TeamForm(CustomQuestionsFormMixin, forms.ModelForm):
 
     class Meta:
         model = Team
-        fields = ('reference', 'institution', 'use_institution_prefix', 'code_name', 'emoji', 'seed', 'break_categories')
+        fields = ('tournament', 'reference', 'institution', 'use_institution_prefix', 'code_name', 'emoji', 'seed', 'break_categories')
+        widgets = {
+            'tournament': forms.HiddenInput(),
+        }
 
     def save(self):
         self.instance.tournament = self.tournament
-        self.instance.institution = self.institution
+
+        if self.institution:
+            self.instance.institution = self.institution
+
+        if 'use_institution_prefix' not in self.tournament.pref('reg_team_fields') and self.tournament.pref('team_name_generator') != 'user':
+            self.instance.use_institution_prefix = bool(self.institution)
+
         obj = super().save()
         self.save_answers(obj)
         return obj
@@ -109,6 +129,9 @@ class SpeakerForm(CustomQuestionsFormMixin, forms.ModelForm):
         self.tournament = tournament
         super().__init__(*args, **kwargs)
 
+        if not (self.tournament.pref('team_name_generator') == 'initials' or self.tournament.pref('code_name_generator') == 'last_names'):
+            self.fields.pop('last_name')
+
         for field in ({'email', 'phone', 'gender', 'categories'} - set(self.tournament.pref('reg_speaker_fields'))):
             self.fields.pop(field)
 
@@ -119,7 +142,7 @@ class SpeakerForm(CustomQuestionsFormMixin, forms.ModelForm):
 
     class Meta:
         model = Speaker
-        fields = ('name', 'email', 'phone', 'gender', 'categories')
+        fields = ('name', 'last_name', 'email', 'phone', 'gender', 'categories')
 
     def save(self):
         obj = super().save()
