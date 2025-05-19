@@ -15,6 +15,11 @@ CONTENT_TYPE_CHOICES = models.Q(app_label='adjfeedback', model='adjudicatorfeedb
                        models.Q(app_label='participants', model='person') | \
                        models.Q(app_label='participants', model='team')
 
+PARTICIPANT_TYPE_CHOICES = models.Q(app_label='participants', model='speaker') | \
+                           models.Q(app_label='participants', model='adjudicator') | \
+                           models.Q(app_label='participants', model='team') | \
+                           models.Q(app_label='participants', model='institution')
+
 
 class Answer(models.Model):
 
@@ -127,3 +132,21 @@ class Question(models.Model):
         step = max((int(max_value) - int(min_value)) / 10, 1)
         options = list(range(int(min_value), int(max_value + 1), int(step)))
         return options
+
+
+class Invitation(models.Model):
+    tournament = models.ForeignKey('tournaments.Tournament', models.CASCADE, verbose_name=_("tournament"))
+    for_content_type = models.ForeignKey(ContentType, models.CASCADE, limit_choices_to=PARTICIPANT_TYPE_CHOICES,
+        verbose_name=_("for content type"))
+    institution = models.ForeignKey('participants.Institution', models.CASCADE, null=True, blank=True, verbose_name=_("institution"))
+    team = models.ForeignKey('participants.Team', models.CASCADE, null=True, blank=True, verbose_name=_("team"))
+    url_key = models.CharField(max_length=50, verbose_name=_("URL key"))
+    created_on = models.DateTimeField(auto_now=True, verbose_name=_("created on"))
+
+    class Meta:
+        verbose_name = _("invitation")
+        verbose_name_plural = _("invitations")
+        constraints = [UniqueConstraint(fields=['tournament', 'url_key'])]
+
+    def __str__(self):
+        return '%s: %s invitation (%s)' % (self.tournament.name, self.for_content_type, self.team or self.institution)

@@ -226,7 +226,13 @@ class PersonIndexView(SingleObjectByRandomisedUrlMixin, PersonalizablePublicTour
         if hasattr(self.object, 'adjudicator'):
             kwargs['debateadjudications'] = BaseRecordView.allocations_set(self.object.adjudicator, False, self.tournament)
         else:
-            kwargs['debateteams'] = BaseRecordView.allocations_set(self.object.speaker.team, False, self.tournament)
+            team = self.object.speaker.team
+            kwargs['debateteams'] = BaseRecordView.allocations_set(team, False, self.tournament)
+
+            if invitation := team.invitation_set.first():
+                kwargs['speaker_invite_link'] = self.request.build_absolute_uri(
+                    reverse_tournament('reg-create-speaker', self.tournament, kwargs={'pk': team.pk}) + '?key=' + invitation.url_key,
+                )
 
         kwargs['draw_released'] = t.current_round.draw_status == Round.Status.RELEASED
         kwargs['feedback_pref'] = t.pref('participant_feedback') == 'private-urls'

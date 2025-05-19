@@ -114,6 +114,7 @@ class ActionLogEntry(models.Model):
         INSTITUTION_REGISTER              = 'inst.reg', _("Registered institution")
         TEAM_REGISTER                     = 'te.reg', _("Registered team")
         ADJUDICATOR_REGISTER              = 'aj.reg', _("Registered adjudicator")
+        SPEAKER_REGISTER                  = 'sp.reg', _("Registered speaker")
 
     class Agent(models.TextChoices):
         API = 'a', _("API")

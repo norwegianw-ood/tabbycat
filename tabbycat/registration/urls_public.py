@@ -20,11 +20,11 @@ urlpatterns = [
         ])),
     ])),
     path('adjudicator/',
-        views.BaseCreateAdjudicatorFormView.as_view(),
+        views.PublicCreateAdjudicatorFormView.as_view(),
         name='reg-create-adjudicator'),
     path('team/', include([
         path('',
-            views.BaseCreateTeamFormView.as_view(),
+            views.PublicCreateTeamFormView.as_view(),
             name='reg-create-team'),
         path('<int:pk>/speaker/',
             views.CreateSpeakerFormView.as_view(),
