@@ -65,7 +65,7 @@ class CreateInstitutionFormView(LogActionMixin, PublicTournamentPageMixin, Custo
         ('institution', TournamentInstitutionForm),
         ('coach', InstitutionCoachForm),
     ]
-    template_name = 'wizard_registration_form.html'
+    template_name = 'institution_registration_form.html'
     page_emoji = '🏫'
     page_title = gettext_lazy("Register Institution")
 
@@ -94,7 +94,7 @@ class BaseCreateTeamFormView(LogActionMixin, PublicTournamentPageMixin, CustomQu
         ('team', TeamForm),
         ('speaker', modelformset_factory(Speaker, form=SpeakerForm, extra=0)),
     ]
-    template_name = 'wizard_registration_form.html'
+    template_name = 'team_registration_form.html'
     page_emoji = '👯'
 
     public_page_preference = 'open_team_registration'

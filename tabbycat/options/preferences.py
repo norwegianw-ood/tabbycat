@@ -1694,3 +1694,36 @@ class CodeNameGenerator(ChoicePreference):
         ('last_names', _("Last names (e.g. 'Jones & Smith')")),
     )
     default = 'emoji'
+
+
+@tournament_preferences_registry.register
+class InstitutionRegisterMessage(LongStringPreference):
+    help_text = _("Message to be displayed on the institution registration form")
+    verbose_name = _("Institution register message")
+    section = registration
+    name = 'institution_register_message'
+    default = ""
+    widget = SummernoteWidget(attrs={'height': 150, 'class': 'form-summernote'})
+    field_kwargs = {'required': False}
+
+
+@tournament_preferences_registry.register
+class AdjudicatorRegisterMessage(LongStringPreference):
+    help_text = _("Message to be displayed on the adjudicator registration form")
+    verbose_name = _("Adjudicator register message")
+    section = registration
+    name = 'adjudicator_register_message'
+    default = ""
+    widget = SummernoteWidget(attrs={'height': 150, 'class': 'form-summernote'})
+    field_kwargs = {'required': False}
+
+
+@tournament_preferences_registry.register
+class TeamRegisterMessage(LongStringPreference):
+    help_text = _("Message to be displayed on the team registration form")
+    verbose_name = _("Team register message")
+    section = registration
+    name = 'team_register_message'
+    default = ""
+    widget = SummernoteWidget(attrs={'height': 150, 'class': 'form-summernote'})
+    field_kwargs = {'required': False}
