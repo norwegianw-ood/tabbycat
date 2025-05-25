@@ -151,6 +151,10 @@ class Permission(TextChoices):
     DELETE_QUESTIONS = 'delete.questions', _("delete general questions")
     VIEW_CUSTOM_ANSWERS = 'view.answers', _("view answers to general questions")
 
+    # Schedule
+    EDIT_EVENTS = 'edit.events', _("edit events")
+    VIEW_EVENTS = 'view.events', _("view events")
+
     VIEW_REGISTRATION = 'view.registration', _("view registration responses")
 
 
