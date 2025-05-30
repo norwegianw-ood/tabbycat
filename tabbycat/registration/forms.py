@@ -178,3 +178,42 @@ class AdjudicatorForm(CustomQuestionsFormMixin, forms.ModelForm):
         obj = super().save()
         self.save_answers(obj)
         return obj
+
+
+class ParticipantAllocationForm(forms.Form):
+    """Updates the number of participants allocated for each institution"""
+
+    def __init__(self, tournament, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.tournament = tournament
+        self._create_and_initialise_fields()
+
+    @staticmethod
+    def _fieldname_teams_allocated(institution):
+        return 'teams_alloc_%(institution)d' % {'institution': institution.id}
+
+    @staticmethod
+    def _fieldname_adjs_allocated(institution):
+        return 'adjs_alloc_%(institution)d' % {'institution': institution.id}
+
+    def get_teams_allocated_field(self, institution):
+        return self[self._fieldname_teams_allocated(institution)].as_widget(attrs={'class': 'form-control'})
+
+    def get_adjs_allocated_field(self, institution):
+        return self[self._fieldname_adjs_allocated(institution)].as_widget(attrs={'class': 'form-control'})
+
+    def _create_and_initialise_fields(self):
+        for t_inst in self.tournament.tournamentinstitution_set.select_related('institution').all():
+            institution = t_inst.institution
+            self.fields[self._fieldname_teams_allocated(institution)] = forms.IntegerField(min_value=0, required=False)
+            self.initial[self._fieldname_teams_allocated(institution)] = t_inst.teams_allocated
+            self.fields[self._fieldname_adjs_allocated(institution)] = forms.IntegerField(min_value=0, required=False)
+            self.initial[self._fieldname_adjs_allocated(institution)] = t_inst.adjudicators_allocated
+
+    def save(self):
+        qs = self.tournament.tournamentinstitution_set.select_related('institution').all()
+        for t_inst in qs:
+            institution = t_inst.institution
+            t_inst.teams_allocated = self.cleaned_data[self._fieldname_teams_allocated(institution)]
+            t_inst.adjudicators_allocated = self.cleaned_data[self._fieldname_adjs_allocated(institution)]
+        TournamentInstitution.objects.bulk_update(qs, ['teams_allocated', 'adjudicators_allocated'])
