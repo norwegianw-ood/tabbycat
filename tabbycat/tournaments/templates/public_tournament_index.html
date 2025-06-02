@@ -117,6 +117,12 @@
           {% endif %}
         {% endif %}
 
+        {% if pref.public_schedule %}
+          {% trans "Schedule" as text %}
+          {% tournamenturl 'tournament-public-schedule' as url %}
+          {% include "components/item-action.html" with icon="clock" %}
+        {% endif %}
+
         {% if pref.public_checkins %}
           {% trans "Check-Ins" as text %}
           {% tournamenturl 'checkins-public-status' as url %}
@@ -213,6 +219,26 @@
           {% endfor %}
         {% endif %}
 
+      </div>
+
+      <div class="list-group mt-2">
+        {% if pref.institution_registration %}
+          {% trans "Register Institution" as text %}
+          {% tournamenturl 'reg-create-institution' as url %}
+          {% include "components/item-action.html" with icon="home" %}
+        {% endif %}
+
+        {% if pref.open_team_registration %}
+          {% trans "Register Open Team" as text %}
+          {% tournamenturl 'reg-create-team' as url %}
+          {% include "components/item-action.html" with icon="users" %}
+        {% endif %}
+
+        {% if pref.open_adj_registration %}
+          {% trans "Register Open Adjudicator" as text %}
+          {% tournamenturl 'reg-create-adjudicator' as url %}
+          {% include "components/item-action.html" with icon="columns" %}
+        {% endif %}
       </div>
 
       {% if pref.tournament_staff %}

@@ -45,7 +45,6 @@ class AdjudicationCore(BaseGroup):
         Permission.EDIT_DEBATEADJUDICATORS,
         Permission.EDIT_FEEDBACK_CONFIRM,
         Permission.EDIT_FEEDBACK_IGNORE,
-        Permission.EDIT_JUDGESCORES_BULK,
         Permission.EDIT_BASEJUDGESCORES_IND,
         Permission.EDIT_MOTION,
         Permission.EDIT_STARTTIME,
@@ -105,4 +104,25 @@ class Language(BaseGroup):
         Permission.EDIT_SPEAKER_CATEGORIES,
         Permission.VIEW_PARTICIPANTS,
         Permission.VIEW_TEAMS,
+    ]
+
+
+class Registration(BaseGroup):
+    name = _("Registration")
+    permissions = [
+        Permission.ADD_TEAMS,
+        Permission.VIEW_DECODED_TEAMS,
+        Permission.VIEW_ANONYMOUS,
+        Permission.ADD_ADJUDICATORS,
+        Permission.ADD_INSTITUTIONS,
+        Permission.VIEW_PARTICIPANTS,
+        Permission.VIEW_PARTICIPANT_GENDER,
+        Permission.VIEW_PARTICIPANT_CONTACT,
+        Permission.VIEW_PARTICIPANT_DECODED,
+        Permission.VIEW_PARTICIPANT_INST,
+        Permission.VIEW_SETTINGS,
+        Permission.EDIT_QUESTIONS,
+        Permission.DELETE_QUESTIONS,
+        Permission.VIEW_CUSTOM_ANSWERS,
+        Permission.VIEW_REGISTRATION,
     ]

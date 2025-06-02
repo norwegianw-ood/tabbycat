@@ -120,7 +120,7 @@ class TestPowerPairedDrawGeneratorParts(unittest.TestCase):
                 self.assertEqual(GraphCostMixin._pairings_fold_top_adjacent_rest([teams[3], team], 8, bracket=i), expected)
 
     def test_add_pullup_penalty(self):
-        teams = [TestTeam(i+1, chr(ord('A') + i), subrank=i+1, pullup_debates=i+1) for i in range(2)]
+        teams = [TestTeam(i+1, chr(ord('A') + i), points=i, subrank=i+1, pullup_debates=i+1) for i in range(2)]
         gcm = GraphPowerPairedDrawGenerator(teams)
         gcm.options = {'pullup_debates_penalty': 1, 'pairing_method': 'random', 'avoid_history': False, 'avoid_institution': False, 'side_allocations': False}
         gcm.team_flags = {teams[0]: ['pullup']}
@@ -138,3 +138,11 @@ class TestPowerPairedDrawGeneratorParts(unittest.TestCase):
         gcm = GraphPowerPairedDrawGenerator([team, team])
         gcm.options = {'pullup_debates_penalty': 1, 'pairing_method': 'fold', 'avoid_history': False, 'avoid_institution': False, 'side_allocations': False, 'pairing_penalty': 1}
         self.assertEqual(gcm.assignment_cost(team, team, 2), None)
+
+    def test_none_max_side_balance_penalty(self):
+        teams = [TestTeam(1, 'A', side_history=(2, 0), subrank=1), TestTeam(2, 'B', side_history=(1, 1), subrank=2)]
+        gcm = GraphPowerPairedDrawGenerator(teams)
+        gcm.options = {'side_allocations': 'balance', 'max_times_on_one_side': 1,
+                       'avoid_history': False, 'avoid_institution': False, 'side_penalty': 1, 'pairing_method': 'fold', 'pairing_penalty': 1, 'pullup_debates_penalty': 1}
+        cost = gcm.assignment_cost(*teams, 2)
+        self.assertEqual(cost, None)

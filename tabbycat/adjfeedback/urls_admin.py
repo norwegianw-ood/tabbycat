@@ -58,6 +58,10 @@ urlpatterns = [
         views.AdminAddFeedbackView.as_view(model=Adjudicator),
         name='adjfeedback-add-from-adjudicator'),
 
+    path('questions/',
+        views.AdjFeedbackQuestionsFormset.as_view(),
+        name='adjfeedback-edit-questions'),
+
     # Updating in bulk
     path('scores/bulk-update/',
         views.UpdateAdjudicatorScoresView.as_view(),

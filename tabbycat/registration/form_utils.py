@@ -35,7 +35,7 @@ class BlankUnknownBooleanSelect(forms.NullBooleanSelect):
             ('3', gettext_lazy('No')),
         )
         # skip the NullBooleanSelect constructor
-        super().__init__(attrs, choices)
+        super(forms.NullBooleanSelect, self).__init__(attrs, choices)
 
 
 class BooleanSelectField(forms.NullBooleanField):

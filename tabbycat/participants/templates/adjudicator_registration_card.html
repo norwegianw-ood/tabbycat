@@ -44,7 +44,24 @@
       </div>
     {% endif %}
 
-    {% if admin_page %}
+    {% haspermission "view.answers" as answers_perm %}
+    {% if admin_page and answers_perm %}
+      <div class="list-group-item list-group-item-secondary">
+        <div>
+          <strong>{% trans "Custom Questions:" %}</strong>
+
+          <details>
+            <summary>{{ adjudicator.name }}</summary>
+
+            <ul>
+              {% for answer in adjudicator.answers.all %}
+                <li><strong>{{ answer.question.name }}</strong>: {{ answer.answer }}</li>
+              {% endfor %}
+            </ul>
+          </details>
+        </div>
+      </div>
+
       <div class="list-group-item list-group-item-secondary">
         <div>
           <strong>{% trans "Institutional Conflicts:" %}</strong>

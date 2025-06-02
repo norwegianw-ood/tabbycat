@@ -1,5 +1,7 @@
 import random
 from collections import OrderedDict
+from itertools import groupby
+from operator import attrgetter
 from typing import Optional, TYPE_CHECKING
 
 from django.utils.translation import gettext as _
@@ -75,6 +77,7 @@ class BasePowerPairedDrawGenerator(BasePairDrawGenerator):
         "avoid_conflicts"       : "one_up_one_down",
         "pullup_restriction"    : "none",
         "pullup_debates_penalty": 0,
+        "pullup_penalty"        : 0,
     }
 
     PAIRING_FUNCTIONS = {
@@ -102,14 +105,14 @@ class BasePowerPairedDrawGenerator(BasePairDrawGenerator):
             self.check_teams_for_attribute(pullup_metric, checkfunc=lambda x: isinstance(x, (int, float)))
 
     def generate(self):
-        self._brackets = self._make_raw_brackets()
-        self.resolve_odd_brackets(self._brackets)  # operates in-place
+        brackets = self._make_raw_brackets()
+        self.resolve_odd_brackets(brackets)  # operates in-place
 
-        self._pairings = self.generate_pairings(self._brackets)
-        self.avoid_conflicts(self._pairings)  # operates in-place
+        pairings = self.generate_pairings(brackets)
+        self.avoid_conflicts(pairings)  # operates in-place
 
         self._draw = list()
-        for bracket in self._pairings.values():
+        for bracket in pairings.values():
             self._draw.extend(bracket)
 
         self.allocate_sides(self._draw)  # operates in-place
@@ -161,6 +164,8 @@ class BasePowerPairedDrawGenerator(BasePairDrawGenerator):
         "pullup_random"              : "_pullup_random",
         "intermediate"               : "_intermediate_brackets",
         "intermediate_bubble_up_down": "_intermediate_brackets_with_bubble_up_down",
+        "pullup_lowest_ds_rank"      : "_pullup_lowest_ds_rank",
+        "pullup_lowest_ds_rank_npulls": "_pullup_lowest_ds_rank_npulls",
     }
 
     def resolve_odd_brackets(self, brackets):
@@ -285,16 +290,16 @@ class GraphCostMixin:
         # necessary for enumerated seed values
         return max([t.subrank for t in teams if t.subrank is not None])
 
-    def assignment_cost(self, t1, t2, size, bracket=None):
+    def assignment_cost(self, t1, t2, size, bracket=None) -> Optional[int]:
         penalty = super().assignment_cost(t1, t2, size)
         if penalty is None:
             return None
 
         # Add penalty for seeing the pullup again
-        has_pullup = 'pullup' in self.team_flags.get(t1, []) or 'pullup' in self.team_flags.get(t2, [])
-        if self.options["pullup_debates_penalty"] and has_pullup:
+        if self.options["pullup_debates_penalty"] and t1.points != t2.points:
             penalty += max(t1.pullup_debates, t2.pullup_debates) * self.options["pullup_debates_penalty"]
 
+        # Add penalty for deviations in the pairing method
         if self.options["pairing_method"] != "random":
             subpool_penalty_func = self.get_option_function("pairing_method", self.PAIRING_FUNCTIONS)
 
@@ -455,6 +460,80 @@ class AustralsPairingMixin:
 
 class GraphPowerPairedDrawGenerator(GraphCostMixin, GraphGeneratorMixin, BasePowerPairedDrawGenerator):
     pass
+
+
+class SingleGraphPowerPairedDrawGenerator(GraphCostMixin, GraphGeneratorMixin, BasePowerPairedDrawGenerator):
+
+    def generate(self):
+        self.annotate_team_pullup_precedence(self.teams)
+        pairings = self.generate_pairings({0: list(self.teams)})
+
+        draw = list()
+        for bracket in pairings.values():
+            draw.extend(bracket)
+
+        self.allocate_sides(draw)  # operates in-place
+        self.annotate_team_flags(draw)  # operates in-place
+        return draw
+
+    def assignment_cost(self, t1, t2, size, bracket=None) -> Optional[int]:
+        penalty = super().assignment_cost(t1, t2, size)
+        if penalty is None:
+            return None
+
+        # Add penalty for pulling up
+        if (is_pullup := abs(t1.points - t2.points)) >= 1:
+            if is_pullup > 1:  # Don't allow pulling up more than one bracket
+                return None
+
+            pullup_team = min([t1, t2], key=attrgetter('points'))  # Include penalty for the pulled up team
+            penalty += pullup_team.pullup_magnitude
+        return penalty
+
+    def annotate_team_pullup_precedence(self, teams):
+        sort_function = self.get_option_function("odd_bracket", self.ODD_BRACKET_FUNCTIONS)
+
+        for n_points, bracket_group in groupby(teams, key=attrgetter('points')):
+            bracket = list(bracket_group)
+            i = 1
+            current_cost = 0
+            for team in sorted(bracket, key=lambda t: sort_function(t, size=len(bracket))):
+                if (new_cost := sort_function(team, size=len(bracket))) != current_cost:
+                    current_cost = new_cost
+                    i += 1
+                team.pullup_magnitude = i * self.options['pullup_penalty']
+
+    # Pullup penalty methods
+    @staticmethod
+    def _pullup_top(team, size=None):
+        return team.subrank
+
+    @staticmethod
+    def _pullup_bottom(team, size=None):
+        return -team.subrank
+
+    @staticmethod
+    def _pullup_middle(team, size=None):
+        return abs(size // 2 - team.subrank)
+
+    @staticmethod
+    def _pullup_random(team, size=None):
+        return 0
+
+    @staticmethod
+    def _pullup_lowest_ds_rank(team, size=None):
+        return -team.draw_strength_rank
+
+    @staticmethod
+    def _pullup_lowest_ds_rank_npulls(team, size=None):
+        return [team.npullups, -team.draw_strength_rank]
+
+    def annotate_team_flags(self, pairings):
+        """Only flag that can be added is 'pullup', and can only be determined after generation"""
+        for pairing in pairings:
+            for team in pairing.teams:
+                if team.points < max(t.points for t in pairing.teams):
+                    pairing.add_team_flags(team, ['pullup'])
 
 
 class AustralsPowerPairedDrawGenerator(AustralsPairingMixin, BasePowerPairedDrawGenerator):
