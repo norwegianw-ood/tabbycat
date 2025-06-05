@@ -1,7 +1,7 @@
 from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.forms import SimpleArrayField
-from django.db.models import Count, Prefetch
+from django.db.models import Count, Prefetch, Sum
 from django.forms import modelformset_factory
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
@@ -367,6 +367,17 @@ class InstitutionRegistrationTableView(TournamentMixin, AdministratorMixin, VueT
         messages.success(self.request, _("Successfully modified institution allocations"))
 
         return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        kwargs.update(self.tournament.tournamentinstitution_set.aggregate(
+            adjs_requested=Sum('adjudicators_requested'),
+            adjs_allocated=Sum('adjudicators_allocated'),
+            teams_requested=Sum('teams_requested'),
+            teams_allocated=Sum('teams_allocated'),
+        ))
+        kwargs['adjs_registered'] = self.tournament.adjudicator_set.filter(institution__isnull=False, adj_core=False, independent=False).count()
+        kwargs['teams_registered'] = self.tournament.team_set.filter(institution__isnull=False).count()
+        return super().get_context_data(**kwargs)
 
 
 class TeamRegistrationTableView(TournamentMixin, AdministratorMixin, VueTableTemplateView):
