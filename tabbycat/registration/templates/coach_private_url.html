@@ -35,9 +35,12 @@
         </div>
       {% endif %}
 
-      <div class="list-group-item">
-        <em>Placeholder for invitation link</em>
-      </div>
+      {% if adjudicator_invitation_link %}
+        <div class="list-group-item small">
+          <em>{% trans "or distribute this link to allow members to register themselves as adjudicators:" %}</em><br />
+          <a href="{{ adjudicator_invitation_link }}" class="mixed-text">{{ adjudicator_invitation_link }}</a>
+        </div>
+      {% endif %}
     </div>
 
     <div class="card mb-3 panel-default">
@@ -51,9 +54,12 @@
         </div>
       {% endif %}
 
-      <div class="list-group-item">
-        <em>Placeholder for invitation link</em>
-      </div>
+      {% if team_invitation_link %}
+        <div class="list-group-item small">
+          <em>{% trans "or distribute this link to allow members to register their teams:" %}</em><br />
+          <a href="{{ team_invitation_link }}" class="mixed-text">{{ team_invitation_link }}</a>
+        </div>
+      {% endif %}
     </div>
   </div>
 

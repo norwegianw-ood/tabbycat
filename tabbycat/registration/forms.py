@@ -6,6 +6,7 @@ from django.utils.translation import gettext_lazy as _
 
 from participants.emoji import EMOJI_RANDOM_FIELD_CHOICES
 from participants.models import Adjudicator, Coach, Institution, Speaker, Team, TournamentInstitution
+from privateurls.utils import populate_url_keys
 
 from .form_utils import CustomQuestionsFormMixin
 
@@ -55,21 +56,29 @@ class InstitutionCoachForm(CustomQuestionsFormMixin, forms.ModelForm):
     class Meta:
         model = Coach
         fields = ('name', 'email')
+        labels = {
+            'name': _('Coach name'),
+        }
 
     def save(self):
         obj = super().save()
+        populate_url_keys([obj])
         self.save_answers(obj)
         return obj
 
 
 class TeamForm(CustomQuestionsFormMixin, forms.ModelForm):
 
-    def __init__(self, tournament, *args, institution=None, **kwargs):
+    key = forms.CharField(widget=forms.HiddenInput(), required=False)
+
+    def __init__(self, tournament, *args, institution=None, key=None, **kwargs):
         self.tournament = tournament
         self.institution = institution
         super().__init__(*args, **kwargs)
 
         self.fields['tournament'].initial = self.tournament
+        if key:
+            self.fields['key'].initial = key
 
         use_inst_field = self.fields['use_institution_prefix']
         use_inst_field.initial = bool(self.institution)
@@ -125,9 +134,14 @@ class TeamForm(CustomQuestionsFormMixin, forms.ModelForm):
 
 class SpeakerForm(CustomQuestionsFormMixin, forms.ModelForm):
 
-    def __init__(self, tournament, *args, **kwargs):
-        self.tournament = tournament
+    key = forms.CharField(widget=forms.HiddenInput(), required=False)
+
+    def __init__(self, team, key, *args, tournament=None, **kwargs):
+        self.team = team
+        self.tournament = team.tournament
         super().__init__(*args, **kwargs)
+
+        self.fields['key'].initial = key
 
         if not (self.tournament.pref('team_name_generator') == 'initials' or self.tournament.pref('code_name_generator') == 'last_names'):
             self.fields.pop('last_name')
@@ -136,7 +150,7 @@ class SpeakerForm(CustomQuestionsFormMixin, forms.ModelForm):
             self.fields.pop(field)
 
         if 'categories' in self.fields:
-            self.fields['categories'].queryset = tournament.speakercategory_set.filter(public=True)
+            self.fields['categories'].queryset = self.tournament.speakercategory_set.filter(public=True)
 
         self.add_question_fields()
 
@@ -144,18 +158,25 @@ class SpeakerForm(CustomQuestionsFormMixin, forms.ModelForm):
         model = Speaker
         fields = ('name', 'last_name', 'email', 'phone', 'gender', 'categories')
 
-    def save(self):
+    def save(self, commit=True):
+        self.instance.team = self.team
         obj = super().save()
+        populate_url_keys([obj])
         self.save_answers(obj)
         return obj
 
 
 class AdjudicatorForm(CustomQuestionsFormMixin, forms.ModelForm):
 
-    def __init__(self, tournament, *args, institution=None, **kwargs):
+    key = forms.CharField(widget=forms.HiddenInput(), required=False)
+
+    def __init__(self, tournament, *args, institution=None, key=None, **kwargs):
         self.tournament = tournament
         self.institution = institution
         super().__init__(*args, **kwargs)
+
+        if key:
+            self.fields['key'].initial = key
 
         for field in ({'email', 'phone', 'gender'} - set(self.tournament.pref('reg_adjudicator_fields'))):
             self.fields.pop(field)
@@ -176,5 +197,6 @@ class AdjudicatorForm(CustomQuestionsFormMixin, forms.ModelForm):
             self.instance.institution = self.institution
 
         obj = super().save()
+        populate_url_keys([obj])
         self.save_answers(obj)
         return obj
