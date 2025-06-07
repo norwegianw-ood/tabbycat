@@ -1,12 +1,12 @@
 from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.forms import SimpleArrayField
-from django.db.models import Prefetch
+from django.db.models import Count, Prefetch, Sum
 from django.forms import modelformset_factory
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext as _, gettext_lazy, ngettext
-from django.views.generic.edit import CreateView
+from django.views.generic.edit import CreateView, FormView
 from formtools.wizard.views import SessionWizardView
 
 from actionlog.mixins import LogActionMixin
@@ -20,7 +20,7 @@ from utils.mixins import AdministratorMixin
 from utils.tables import TabbycatTableBuilder
 from utils.views import ModelFormSetView, VueTableTemplateView
 
-from .forms import AdjudicatorForm, InstitutionCoachForm, SpeakerForm, TeamForm, TournamentInstitutionForm
+from .forms import AdjudicatorForm, InstitutionCoachForm, ParticipantAllocationForm, SpeakerForm, TeamForm, TournamentInstitutionForm
 from .models import Invitation, Question
 from .utils import populate_invitation_url_keys
 
@@ -434,7 +434,8 @@ def handle_question_columns(table: TabbycatTableBuilder, objects, questions=None
         table.add_column({'key': f'cq-{question.pk}-{suffix}', 'title': question.name}, answers)
 
 
-class InstitutionRegistrationTableView(TournamentMixin, AdministratorMixin, VueTableTemplateView):
+class InstitutionRegistrationTableView(TournamentMixin, AdministratorMixin, VueTableTemplateView, FormView):
+    form_class = ParticipantAllocationForm
     page_emoji = '🏫'
     page_title = gettext_lazy("Institutional Registration")
     template_name = 'answer_tables/institutions.html'
@@ -446,28 +447,67 @@ class InstitutionRegistrationTableView(TournamentMixin, AdministratorMixin, VueT
             'answers__question',
         ).all()
 
+        inst_team_count = {i.id: i.agg for i in self.tournament.tournamentinstitution_set.annotate(agg=Count('institution__team')).all()}
+        inst_adj_count = {i.id: i.agg for i in self.tournament.tournamentinstitution_set.annotate(agg=Count('institution__adjudicator')).all()}
+
+        form = self.get_form()
+
         table = TabbycatTableBuilder(view=self, title=_('Responses'), sort_key='name')
         table.add_column({'key': 'name', 'title': _("Name")}, [t_inst.institution.name for t_inst in t_institutions])
         table.add_column({'key': 'name', 'title': _("Coach")}, [{
             'text': (coach := t_inst.coach_set.first()).name,
             'link': reverse_tournament('reg-inst-landing', self.tournament, kwargs={'url_key': coach.url_key}),
         } for t_inst in t_institutions])
-        table.add_column({'key': 'teams_requested', 'title': _("Teams Requested")}, [
-            {'text': t_inst.teams_requested, 'sort': t_inst.teams_requested} for t_inst in t_institutions
-        ])
-        table.add_column({'key': 'teams_allocated', 'title': _("Teams Allocated")}, [
-            {'text': t_inst.teams_allocated, 'sort': t_inst.teams_allocated} for t_inst in t_institutions
-        ])
-        table.add_column({'key': 'adjudicators_requested', 'title': _("Adjudicators Requested")}, [
-            {'text': t_inst.adjudicators_requested, 'sort': t_inst.adjudicators_requested} for t_inst in t_institutions
-        ])
-        table.add_column({'key': 'adjudicators_allocated', 'title': _("Adjudicators Allocated")}, [
-            {'text': t_inst.adjudicators_allocated, 'sort': t_inst.adjudicators_allocated} for t_inst in t_institutions
-        ])
+        if self.tournament.pref('reg_institution_slots'):
+            table.add_column({'key': 'teams_requested', 'title': _("Teams Requested")}, [
+                {'text': t_inst.teams_requested, 'sort': t_inst.teams_requested} for t_inst in t_institutions
+            ])
+            table.add_column({'key': 'teams_allocated', 'title': _("Teams Allocated")}, [
+                {'text': str(form.get_teams_allocated_field(t_inst.institution)), 'sort': t_inst.teams_allocated} for t_inst in t_institutions
+            ])
+
+        if self.tournament.pref('institution_participant_registration'):
+            table.add_column({'key': 'teams_registered', 'title': _("Teams Registered")}, [inst_team_count[t_inst.id] for t_inst in t_institutions])
+
+        if self.tournament.pref('reg_institution_slots'):
+            table.add_column({'key': 'adjudicators_requested', 'title': _("Adjudicators Requested")}, [
+                {'text': t_inst.adjudicators_requested, 'sort': t_inst.adjudicators_requested} for t_inst in t_institutions
+            ])
+            table.add_column({'key': 'adjudicators_allocated', 'title': _("Adjudicators Allocated")}, [
+                {'text': str(form.get_adjs_allocated_field(t_inst.institution)), 'sort': t_inst.adjudicators_allocated} for t_inst in t_institutions
+            ])
+
+        if self.tournament.pref('institution_participant_registration'):
+            table.add_column({'key': 'adjudicators_registered', 'title': _("Adjudicators Registered")}, [inst_adj_count[t_inst.id] for t_inst in t_institutions])
 
         handle_question_columns(table, t_institutions)
 
         return table
+
+    def get_success_url(self):
+        return reverse_tournament('reg-institution-list', self.tournament)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['tournament'] = self.tournament
+        return kwargs
+
+    def form_valid(self, form):
+        form.save()
+        messages.success(self.request, _("Successfully modified institution allocations"))
+
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        kwargs.update(self.tournament.tournamentinstitution_set.aggregate(
+            adjs_requested=Sum('adjudicators_requested'),
+            adjs_allocated=Sum('adjudicators_allocated'),
+            teams_requested=Sum('teams_requested'),
+            teams_allocated=Sum('teams_allocated'),
+        ))
+        kwargs['adjs_registered'] = self.tournament.adjudicator_set.filter(institution__isnull=False, adj_core=False, independent=False).count()
+        kwargs['teams_registered'] = self.tournament.team_set.filter(institution__isnull=False).count()
+        return super().get_context_data(**kwargs)
 
 
 class TeamRegistrationTableView(TournamentMixin, AdministratorMixin, VueTableTemplateView):
