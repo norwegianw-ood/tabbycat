@@ -111,6 +111,7 @@ class EmailStatusView(AdministratorMixin, TournamentMixin, VueTableTemplateView)
             EmailStatus.EventType.DROPPED: 'text-warning',
             EmailStatus.EventType.SPAM: 'text-warning',
             EmailStatus.EventType.DEFERRED: 'text-warning',
+            EmailStatus.EventType.FAILED: 'text-warning',
             EmailStatus.EventType.PROCESSED: 'text-info',
             EmailStatus.EventType.DELIVERED: 'text-info',
             EmailStatus.EventType.OPENED: 'text-success',
