@@ -6,6 +6,7 @@ from django.utils.translation import gettext_lazy as _
 
 from participants.emoji import EMOJI_RANDOM_FIELD_CHOICES
 from participants.models import Adjudicator, Coach, Institution, Speaker, Team, TournamentInstitution
+from privateurls.utils import populate_url_keys
 
 from .form_utils import CustomQuestionsFormMixin
 
@@ -55,21 +56,29 @@ class InstitutionCoachForm(CustomQuestionsFormMixin, forms.ModelForm):
     class Meta:
         model = Coach
         fields = ('name', 'email')
+        labels = {
+            'name': _('Coach name'),
+        }
 
     def save(self):
         obj = super().save()
+        populate_url_keys([obj])
         self.save_answers(obj)
         return obj
 
 
 class TeamForm(CustomQuestionsFormMixin, forms.ModelForm):
 
-    def __init__(self, tournament, *args, institution=None, **kwargs):
+    key = forms.CharField(widget=forms.HiddenInput(), required=False)
+
+    def __init__(self, tournament, *args, institution=None, key=None, **kwargs):
         self.tournament = tournament
         self.institution = institution
         super().__init__(*args, **kwargs)
 
         self.fields['tournament'].initial = self.tournament
+        if key:
+            self.fields['key'].initial = key
 
         use_inst_field = self.fields['use_institution_prefix']
         use_inst_field.initial = bool(self.institution)
@@ -125,9 +134,14 @@ class TeamForm(CustomQuestionsFormMixin, forms.ModelForm):
 
 class SpeakerForm(CustomQuestionsFormMixin, forms.ModelForm):
 
-    def __init__(self, tournament, *args, **kwargs):
-        self.tournament = tournament
+    key = forms.CharField(widget=forms.HiddenInput(), required=False)
+
+    def __init__(self, team, key, *args, tournament=None, **kwargs):
+        self.team = team
+        self.tournament = team.tournament
         super().__init__(*args, **kwargs)
+
+        self.fields['key'].initial = key
 
         if not (self.tournament.pref('team_name_generator') == 'initials' or self.tournament.pref('code_name_generator') == 'last_names'):
             self.fields.pop('last_name')
@@ -136,26 +150,36 @@ class SpeakerForm(CustomQuestionsFormMixin, forms.ModelForm):
             self.fields.pop(field)
 
         if 'categories' in self.fields:
-            self.fields['categories'].queryset = tournament.speakercategory_set.filter(public=True)
+            self.fields['categories'].queryset = self.tournament.speakercategory_set.filter(public=True)
 
         self.add_question_fields()
 
     class Meta:
         model = Speaker
         fields = ('name', 'last_name', 'email', 'phone', 'gender', 'categories')
+        labels = {
+            'name': _("Full name for tab"),
+        }
 
-    def save(self):
+    def save(self, commit=True):
+        self.instance.team = self.team
         obj = super().save()
+        populate_url_keys([obj])
         self.save_answers(obj)
         return obj
 
 
 class AdjudicatorForm(CustomQuestionsFormMixin, forms.ModelForm):
 
-    def __init__(self, tournament, *args, institution=None, **kwargs):
+    key = forms.CharField(widget=forms.HiddenInput(), required=False)
+
+    def __init__(self, tournament, *args, institution=None, key=None, **kwargs):
         self.tournament = tournament
         self.institution = institution
         super().__init__(*args, **kwargs)
+
+        if key:
+            self.fields['key'].initial = key
 
         for field in ({'email', 'phone', 'gender'} - set(self.tournament.pref('reg_adjudicator_fields'))):
             self.fields.pop(field)
@@ -169,6 +193,9 @@ class AdjudicatorForm(CustomQuestionsFormMixin, forms.ModelForm):
     class Meta:
         model = Adjudicator
         fields = ('name', 'institution', 'email', 'phone', 'gender')
+        labels = {
+            'name': _("Full name for tab"),
+        }
 
     def save(self):
         self.instance.tournament = self.tournament
@@ -176,5 +203,45 @@ class AdjudicatorForm(CustomQuestionsFormMixin, forms.ModelForm):
             self.instance.institution = self.institution
 
         obj = super().save()
+        populate_url_keys([obj])
         self.save_answers(obj)
         return obj
+
+
+class ParticipantAllocationForm(forms.Form):
+    """Updates the number of participants allocated for each institution"""
+
+    def __init__(self, tournament, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.tournament = tournament
+        self._create_and_initialise_fields()
+
+    @staticmethod
+    def _fieldname_teams_allocated(institution):
+        return 'teams_alloc_%(institution)d' % {'institution': institution.id}
+
+    @staticmethod
+    def _fieldname_adjs_allocated(institution):
+        return 'adjs_alloc_%(institution)d' % {'institution': institution.id}
+
+    def get_teams_allocated_field(self, institution):
+        return self[self._fieldname_teams_allocated(institution)].as_widget(attrs={'class': 'form-control'})
+
+    def get_adjs_allocated_field(self, institution):
+        return self[self._fieldname_adjs_allocated(institution)].as_widget(attrs={'class': 'form-control'})
+
+    def _create_and_initialise_fields(self):
+        for t_inst in self.tournament.tournamentinstitution_set.select_related('institution').all():
+            institution = t_inst.institution
+            self.fields[self._fieldname_teams_allocated(institution)] = forms.IntegerField(min_value=0, required=False)
+            self.initial[self._fieldname_teams_allocated(institution)] = t_inst.teams_allocated
+            self.fields[self._fieldname_adjs_allocated(institution)] = forms.IntegerField(min_value=0, required=False)
+            self.initial[self._fieldname_adjs_allocated(institution)] = t_inst.adjudicators_allocated
+
+    def save(self):
+        qs = self.tournament.tournamentinstitution_set.select_related('institution').all()
+        for t_inst in qs:
+            institution = t_inst.institution
+            t_inst.teams_allocated = self.cleaned_data[self._fieldname_teams_allocated(institution)]
+            t_inst.adjudicators_allocated = self.cleaned_data[self._fieldname_adjs_allocated(institution)]
+        TournamentInstitution.objects.bulk_update(qs, ['teams_allocated', 'adjudicators_allocated'])

@@ -17,7 +17,6 @@ from .models import tournament_preferences_registry
 from .types import MultiValueChoicePreference
 from .utils import validate_metric_duplicates
 
-
 # ==============================================================================
 scoring = Section('scoring', verbose_name=_("Score Rules"))
 # ==============================================================================
@@ -668,6 +667,17 @@ class PreparationTime(IntegerPreference):
     default = -1
 
 
+@tournament_preferences_registry.register
+class EnableForfeits(BooleanPreference):
+    help_text = _(
+        "Whether there should be an option in ballot forms to mark a team as having forfeitted "
+        "a round, rendering the debate win/loss without speaker scores")
+    verbose_name = _("Enable forfeits")
+    section = debate_rules
+    name = 'enable_forfeits'
+    default = False
+
+
 # ==============================================================================
 standings = Section('standings', verbose_name=_("Standings"))
 # ==============================================================================
@@ -1179,6 +1189,15 @@ class FeedbackProgress(BooleanPreference):
     verbose_name = _("Enable public view of unsubmitted feedback")
     section = public_features
     name = 'feedback_progress'
+    default = False
+
+
+@tournament_preferences_registry.register
+class PublicSchedule(BooleanPreference):
+    help_text = _("Enables the public page showing the schedule")
+    verbose_name = _("Enable public view of shedule")
+    section = public_features
+    name = 'public_schedule'
     default = False
 
 

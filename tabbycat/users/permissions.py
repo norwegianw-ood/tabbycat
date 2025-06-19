@@ -7,6 +7,7 @@ from django.utils.translation import gettext_lazy as _
 
 if TYPE_CHECKING:
     from django.conf import settings
+
     from tournaments.models import Tournament
 
 PERM_CACHE_KEY = "user_%d_%s_%s_permission"
@@ -150,6 +151,10 @@ class Permission(TextChoices):
     EDIT_QUESTIONS = 'edit.questions', _("edit general questions")
     DELETE_QUESTIONS = 'delete.questions', _("delete general questions")
     VIEW_CUSTOM_ANSWERS = 'view.answers', _("view answers to general questions")
+
+    # Schedule
+    EDIT_EVENTS = 'edit.events', _("edit events")
+    VIEW_EVENTS = 'view.events', _("view events")
 
     VIEW_REGISTRATION = 'view.registration', _("view registration responses")
 

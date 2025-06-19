@@ -117,6 +117,12 @@
           {% endif %}
         {% endif %}
 
+        {% if pref.public_schedule %}
+          {% trans "Schedule" as text %}
+          {% tournamenturl 'tournament-public-schedule' as url %}
+          {% include "components/item-action.html" with icon="clock" %}
+        {% endif %}
+
         {% if pref.public_checkins %}
           {% trans "Check-Ins" as text %}
           {% tournamenturl 'checkins-public-status' as url %}

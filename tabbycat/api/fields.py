@@ -1,3 +1,4 @@
+from datetime import datetime
 from urllib import parse
 
 from django.core.exceptions import ObjectDoesNotExist
@@ -343,10 +344,16 @@ class AnswerSerializer(Serializer):
     def validate(self, data):
         # Convert answer to correct type
         typ = Question.ANSWER_TYPE_TYPES[data['question'].answer_type]
+        if typ is datetime:
+            try:
+                data['answer'] = datetime.fromisoformat(data['answer'])
+            except ValueError:
+                raise ValidationError({'answer': 'The answer must be an ISO 8601 timestamp'})
         if type(data['answer']) != typ:
             raise ValidationError({'answer': 'The answer must be of type %s' % typ.__name__})
 
-        data['answer'] = typ(data['answer'])
+        if typ is not datetime:
+            data['answer'] = typ(data['answer'])
 
         option_error = ValidationError({'answer': 'Answer must be in set of options'})
         if len(data['question'].choices) > 0:

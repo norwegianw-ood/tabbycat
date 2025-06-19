@@ -18,6 +18,7 @@ from .types import DebateSide
 
 if TYPE_CHECKING:
     from participants.models import Team
+
     from .generator.pairing import BasePairing
 
 logger = logging.getLogger(__name__)

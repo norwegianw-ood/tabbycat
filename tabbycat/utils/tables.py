@@ -5,6 +5,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.contrib.humanize.templatetags.humanize import ordinal
 from django.db.models import Exists, OuterRef, Prefetch
 from django.template.loader import render_to_string
+from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.html import escape
 from django.utils.safestring import SafeString
@@ -24,7 +25,6 @@ from users.permissions import has_permission, Permission
 from utils.misc import reverse_round, reverse_tournament
 
 from .mixins import AdministratorMixin
-
 logger = logging.getLogger(__name__)
 _draw_flags_dict = dict(DRAW_FLAG_DESCRIPTIONS)
 
@@ -1019,3 +1019,23 @@ class TabbycatTableBuilder(BaseTableBuilder):
                 show_ballots=show_ballots,
             ) for s in standings]
             self.add_column(header, results)
+
+    def add_schedule_event_columns(self, schedule_events):
+        self.add_column({'title': _("Event"), 'key': _("Event")}, [ev.title for ev in schedule_events])
+
+        starts = [
+            timezone.localtime(ev.start_time)
+                    .strftime("%A, %b %d,  %H:%M")
+            for ev in schedule_events
+        ]
+        self.add_column({'title': _("Start Time"), 'key': _("Start Time")}, starts)
+
+        ends = [
+            (
+                timezone.localtime(ev.end_time)
+                        .strftime("%A, %b %d, %H:%M")
+                if ev.end_time else ""
+            )
+            for ev in schedule_events
+        ]
+        self.add_column({'title': _("End Time"), 'key': _("End Time")}, ends)

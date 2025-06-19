@@ -98,6 +98,8 @@ class CustomQuestionsFormMixin:
                 field = OptionalChoiceField(choices=question.choices_for_field)
             case question.AnswerType.MULTIPLE_SELECT:
                 field = forms.MultipleChoiceField(choices=question.choices_for_field, widget=BlockCheckboxWidget())
+            case question.AnswerType.DATETIME:
+                field = forms.DateTimeField(widget=forms.DateTimeInput(attrs={'type': 'datetime-local'}))
         field.label = question.text
         if question.help_text:
             field.help_text = question.help_text
@@ -116,5 +118,7 @@ class CustomQuestionsFormMixin:
             if response is not None:
                 if question.answer_type is question.AnswerType.MULTIPLE_SELECT:
                     response = json.dumps(response)
+                if question.answer_type is question.AnswerType.DATETIME:
+                    response = response.isoformat()
                 if response != "":
                     question.answer_set.create(content_object=obj, answer=response)

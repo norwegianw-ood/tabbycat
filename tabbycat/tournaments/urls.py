@@ -27,6 +27,9 @@ urlpatterns = [
     path('tab/',                    include('standings.urls_public')),
     path('registration/',           include('registration.urls_public')),
 
+    # Public Schedule
+    path('schedule/',               views.PublicScheduleView.as_view(), name='tournament-public-schedule'),
+
     # Application URLs for admin pages
     path('admin/allocations/',      include('adjallocation.urls')),
     path('admin/availability/',     include('availability.urls')),
@@ -80,4 +83,7 @@ urlpatterns = [
     path('admin/fix-debate-teams/',
         views.FixDebateTeamsView.as_view(),
         name='tournament-fix-debate-teams'),
+    path('admin/schedule/',
+        views.SetTournamentScheduleView.as_view(),
+        name='tournament-set-schedule'),
 ]
