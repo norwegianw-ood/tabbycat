@@ -205,8 +205,9 @@ class BaseCreateTeamFormView(LogActionMixin, PublicTournamentPageMixin, CustomQu
         self.log_action()
         return HttpResponseRedirect(self.get_success_url())
 
-    def _alphabetical_reference(self, team, speakers=None):
-        teams = self.tournament.team_set.filter(institution=self.institution, reference__regex=r"^[A-Z]+$").values_list('reference', flat=True)
+    @staticmethod
+    def _alphabetical_reference(team, speakers=None):
+        teams = team.tournament.team_set.filter(institution=team.institution, reference__regex=r"^[A-Z]+$").values_list('reference', flat=True)
         team_numbers = []
         for existing_team in teams:
             n = 0
@@ -222,32 +223,38 @@ class BaseCreateTeamFormView(LogActionMixin, PublicTournamentPageMixin, CustomQu
 
         return ch
 
-    def _numerical_reference(self, team, speakers=None):
-        teams = self.tournament.team_set.filter(institution=self.institution, reference__regex=r"^\d+$").values_list('reference', flat=True)
+    @staticmethod
+    def _numerical_reference(team, speakers=None):
+        teams = team.tournament.team_set.filter(institution=team.institution, reference__regex=r"^\d+$").values_list('reference', flat=True)
         team_numbers = [int(t) for t in teams]
         return str(max(team_numbers) + 1)
 
-    def _initials_reference(self, team, speakers):
+    @staticmethod
+    def _initials_reference(team, speakers):
         return "".join(s.instance.last_name[0] for s in speakers)
 
-    def _custom_reference(self, team, speakers=None):
+    @staticmethod
+    def _custom_reference(team, speakers=None):
         return team.reference
 
-    def _custom_code_name(self, team, speakers=None):
+    @staticmethod
+    def _custom_code_name(team, speakers=None):
         return team.code_name
 
-    def _emoji_code_name(self, team, speakers=None):
+    @staticmethod
+    def _emoji_code_name(team, speakers=None):
         return EMOJI_NAMES[team.emoji]
 
-    def _last_names_code_name(self, team, speakers=None):
-        return ' & '.join(s.instance.last_name for s in speakers)
+    @staticmethod
+    def _last_names_code_name(team, speakers=None):
+        return ' & '.join(s.instance.last_name for s in speakers if s.instance.last_name is not None)
 
 
 class PublicCreateTeamFormView(BaseCreateTeamFormView):
 
     @property
     def key(self):
-        return self.request.GET.get('key') or self.request.POST.get('key')
+        return self.request.GET.get('key') or self.request.POST.get('team-key') or self.request.POST.get('speaker-0-key')
 
     @property
     def institution(self):
@@ -367,6 +374,14 @@ class CreateSpeakerFormView(LogActionMixin, PublicTournamentPageMixin, CustomQue
     def form_valid(self, form):
         self.object = form.save()
         messages.success(self.request, _("You have been registered as a speaker!"))
+
+        team = self.object.team
+        speakers = team.speaker_set.all()
+        if self.tournament.pref('team_name_generator') == 'initials':
+            team.reference = BaseCreateTeamFormView._initials_reference(team, speakers)
+        if self.tournament.pref('code_name_generator') == 'last_names':
+            team.code_name = BaseCreateTeamFormView._last_names_code_name(team, speakers)
+        team.save()
         return super().form_valid(form)
 
 

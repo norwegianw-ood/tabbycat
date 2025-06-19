@@ -157,6 +157,9 @@ class SpeakerForm(CustomQuestionsFormMixin, forms.ModelForm):
     class Meta:
         model = Speaker
         fields = ('name', 'last_name', 'email', 'phone', 'gender', 'categories')
+        labels = {
+            'name': _("Full name for tab"),
+        }
 
     def save(self, commit=True):
         self.instance.team = self.team
@@ -190,6 +193,9 @@ class AdjudicatorForm(CustomQuestionsFormMixin, forms.ModelForm):
     class Meta:
         model = Adjudicator
         fields = ('name', 'institution', 'email', 'phone', 'gender')
+        labels = {
+            'name': _("Full name for tab"),
+        }
 
     def save(self):
         self.instance.tournament = self.tournament
