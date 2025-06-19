@@ -54,8 +54,8 @@ from .scoresheet import (HighPointWinsRequiredScoresheet, LowPointWinsAllowedSco
 from .utils import side_and_position_names
 
 if TYPE_CHECKING:
-    from tournaments.models import Tournament
     from participants.models import Adjudicator
+    from tournaments.models import Tournament
 
     from .models import SpeakerScore, SpeakerScoreByAdj
 

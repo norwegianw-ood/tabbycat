@@ -29,9 +29,9 @@ from .forms import BasicEmailForm, TestEmailForm
 from .models import BulkNotification, EmailStatus, SentMessage
 
 if TYPE_CHECKING:
-    from django.http.response import HttpResponseRedirect
     from django.db.models import QuerySet
     from django.http.request import HttpRequest
+    from django.http.response import HttpResponseRedirect
 
 logger = logging.getLogger(__name__)
 
