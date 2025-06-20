@@ -22,6 +22,20 @@
   <meta property="og:description" content="{{ meta_description }}" />
   <meta property="og:image" content="{% static 'logo-social.png' %}" />
 
+  {# Set noindex property if configured. #}
+  {% if tournament %}
+    {% if pref.search_engine_indexing == "all" %}
+    {% elif pref.search_engine_indexing == "homepage-only" %}
+        {% tournamenturl 'tournament-public-index' as tournament_homepage_url %}
+        {% if request.path == tournament_homepage_url %}
+        {% else %}
+            <meta name="robots" content="noindex">
+        {% endif %}
+    {% else %}
+        <meta name="robots" content="noindex">
+    {% endif %}
+  {% endif %}
+
   <link rel="preload" href="{% static 'fonts/Inter-Regular.woff2' %}" as="font" type="font/woff2">
   <link rel="icon" type="image/png" href="{% static 'logo-32x32.png' %}" sizes="32x32" />
   <link rel="icon" type="image/png" href="{% static 'logo-16x16.png' %}" sizes="16x16" />
