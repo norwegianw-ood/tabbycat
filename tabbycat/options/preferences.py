@@ -1061,15 +1061,9 @@ public_features = Section('public_features', verbose_name=_("Public Features"))
 
 @tournament_preferences_registry.register
 class AllowSearchEngineIndexing(ChoicePreference):
-    help_text = _("Set whether or not search engines can index the tab."
-                  "This is done by adding a <meta name=\"robots\" content=\"noindex\">"
-                  "tag to appropriate pages. Please note that while most search"
-                  "engines (e.g. Google) do respect this, not all search engines"
-                  "will. While this may be useful in preserving participants"
-                  "privacy, you may wish to also consider other techniques"
-                  "(such as disabling public pages or password-protecting your)"
-                  "web server.")
-    verbose_name = _("Search engine indexing configuration")
+    help_text = _("Adds a flag signaling search engines to not include tournament pages in search results."
+                  "Note that it may get ignored, and the other available settings will provide greater privacy.")
+    verbose_name = _("Include site in search engines")
     section = public_features
     name = 'search_engine_indexing'
     choices = (
