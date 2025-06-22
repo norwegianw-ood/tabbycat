@@ -1060,6 +1060,21 @@ public_features = Section('public_features', verbose_name=_("Public Features"))
 
 
 @tournament_preferences_registry.register
+class AllowSearchEngineIndexing(ChoicePreference):
+    help_text = _("Adds a flag signaling search engines to not include tournament pages in search results."
+                  "Note that it may get ignored, and the other available settings will provide greater privacy.")
+    verbose_name = _("Include site in search engines")
+    section = public_features
+    name = 'search_engine_indexing'
+    choices = (
+        ('all', _("Allow all pages to be indexed by search engines.")),
+        ('homepage-only', _("Only allow the homepage to be indexed, do not allow any other pages (e.g. tabs, ballots, etc).")),
+        ('none', _("Do not allow any pages to be indexed by search engines.")),
+    )
+    default = 'all'
+
+
+@tournament_preferences_registry.register
 class PublicParticipants(BooleanPreference):
     help_text = _("Enables the public page listing all participants in the tournament")
     verbose_name = _("Enable public view of participants list")
