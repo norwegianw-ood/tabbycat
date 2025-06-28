@@ -477,8 +477,12 @@ class ScoresMixin:
     # Form set-up
     # --------------------------------------------------------------------------
 
+    def _has_forfeit_fields(self):
++        """True only if forfeit check-boxes were added (i.e. 2-team debate)."""
++        return len(self.sides) == 2
+
     def create_participant_fields(self):
-        if len(self.sides) == 2:
+        if self._has_forfeit_fields():
             for side in self.sides:
                 self.fields[self._fieldname_forfeit(side)] = forms.BooleanField(required=False)
 
@@ -664,7 +668,9 @@ class ScoresMixin:
                 "side_name": side_name,
                 "team": self.debate.get_team(side),
                 "speakers": [],
-                "forfeit": self[self._fieldname_forfeit(side)],
+                "forfeit": (self[self._fieldname_forfeit(side)]
+                        if self._has_forfeit_fields()
+                        else None),
             }
             for pos, pos_name in zip(self.positions, pos_names):
                 spk_dict = {
