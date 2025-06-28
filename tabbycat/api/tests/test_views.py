@@ -152,5 +152,4 @@ class BallotViewSetTests(CompletedTournamentTestMixin, APITestCase):
 
     def test_access_with_private_url(self):
         response = self.client.get(reverse('api-ballot-list', kwargs={'tournament_slug': self.tournament.slug, 'round_seq': 1, 'debate_pk': 12}), headers={"Authorization": "Key urlkey"})
-        print(response.data)
         self.assertEqual(response.status_code, 200)
