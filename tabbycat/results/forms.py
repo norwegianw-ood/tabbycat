@@ -478,8 +478,7 @@ class ScoresMixin:
     # --------------------------------------------------------------------------
 
     def _has_forfeit_fields(self):
-+        """True only if forfeit check-boxes were added (i.e. 2-team debate)."""
-+        return len(self.sides) == 2
+        return len(self.sides) == 2
 
     def create_participant_fields(self):
         if self._has_forfeit_fields():
