@@ -1441,6 +1441,21 @@ class UserViewSet(AdministratorAPIMixin, ModelViewSet):
         instance.save()
 
 
+@extend_schema(tags=['users'])
+@extend_schema_view(
+    retrieve=extend_schema(summary="Get own user information", parameters=[id_parameter]),
+)
+class OwnUserViewSet(UserViewSet):
+    serializer_class = serializers.UserSerializer
+    list_permission = True
+
+    def get_object(self):
+        queryset = self.filter_queryset(self.get_queryset())
+        obj = get_object_or_404(queryset, pk=self.request.user.pk)
+        obj.tournaments = get_permissions(obj)
+        return obj
+
+
 @extend_schema(tags=['users'], parameters=[tournament_parameter])
 @extend_schema_view(
     list=extend_schema(summary="List all permission groups in tournament"),
@@ -1467,6 +1482,10 @@ class ScoreCriterionViewSet(TournamentAPIMixin, PublicAPIMixin, ModelViewSet):
     serializer_class = serializers.ScoreCriterionSerializer
 
 
+@extend_schema(tags=['participants'])
+@extend_schema_view(
+    retrieve=extend_schema(summary="Get participant from private URL key", parameters=[id_parameter]),
+)
 class ParticipantIdentificationView(TournamentAPIMixin, ModelViewSet):
     serializer_class = serializers.ParticipantIdentificationSerializer
     authentication_classes = [URLKeyAuthentication]
