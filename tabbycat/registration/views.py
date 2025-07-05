@@ -196,10 +196,10 @@ class BaseCreateTeamFormView(LogActionMixin, PublicTournamentPageMixin, CustomQu
                 # replace with query={'key': invitation.url_key} in Django 5.2
             )
             messages.warning(self.request, ngettext(
-                "Your team only has %d speaker! Invite the other speakers to register using this link: <a href='%s'>%s</a>",
-                "Your team only has %d speakers! Invite the other speakers to register using this link: <a href='%s'>%s</a>",
+                "Your team only has %(num)d speaker! Invite the other speakers to register using this link: <a href='%(link)s'>%(link)s</a>",
+                "Your team only has %(num)d speakers! Invite the other speakers to register using this link: <a href='%(link)s'>%(link)s</a>",
                 len(self.speakers),
-            ) % (len(self.speakers), invite_url, invite_url))
+            ) % {'num': len(self.speakers), 'link': invite_url})
 
         messages.success(self.request, _("Your team %s has been registered!") % team.short_name)
         self.log_action()
