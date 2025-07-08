@@ -33,7 +33,7 @@ msgstr[2] ""
 #, python-format
 msgid "%(count)s score is smaller than the minimum permitted adjudicator score (%(score).1f)."
 msgid_plural "%(count)s scores are smaller than the minimum permitted adjudicator score (%(score).1f)."
-msgstr[0] "%(count)s scorul arbitrului este mai mic decât scorul minim admis %(score)"
+msgstr[0] "%(count)s scorul arbitrului este mai mic decât scorul minim admis %(score).1f"
 msgstr[1] ""
 msgstr[2] ""
 

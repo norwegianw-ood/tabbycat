@@ -147,7 +147,7 @@ msgstr "%(name)s (panelist başkanın verdiği rolle karar sebebi açıkladı)"
 #: adjfeedback/forms.py
 #, python-format
 msgid "This line (for %(adjudicator)s) didn't have a score"
-msgstr "Bu satırın (% (adjudicator)s için) bir puanı yoktu"
+msgstr "Bu satırın (%(adjudicator)s için) bir puanı yoktu"
 
 #: adjfeedback/forms.py
 #, python-format
@@ -599,8 +599,8 @@ msgstr[1] "Tur başına %(c_chairs)s maç var, bu yüzden %(c_chairs)s başkan g
 #, python-format
 msgid "There is %(c_debates)s debate per round, but only %(c_chairs)s above the minimum voting score."
 msgid_plural "There are %(c_debates)s debates per round, but only %(c_chairs)s above the minimum voting score."
-msgstr[0] "Tur başına %(c_chairs)s maç var, ancak minimum oy puanının üzerinde sadece %(c_chairs) var."
-msgstr[1] "Tur başına %(c_chairs)s maç var, ancak minimum oy puanının üzerinde sadece %(c_chairs) var."
+msgstr[0] "Tur başına %(c_debates)s maç var, ancak minimum oy puanının üzerinde sadece %(c_chairs)s var."
+msgstr[1] "Tur başına %(c_debates)s maç var, ancak minimum oy puanının üzerinde sadece %(c_chairs)s var."
 
 #: adjfeedback/templates/overview_breakdowns.html
 #, python-format
