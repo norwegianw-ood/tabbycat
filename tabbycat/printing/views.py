@@ -40,7 +40,7 @@ class BasePrintFeedbackFormsView(RoundMixin, TemplateView):
 
         default_scale_question = AdjudicatorFeedbackQuestion(
             text=_("Overall Score"), seq=0,
-            answer_type=AdjudicatorFeedbackQuestion.ANSWER_TYPE_INTEGER_SCALE,
+            answer_type=AdjudicatorFeedbackQuestion.AnswerType.INTEGER_SCALE,
             required=True, from_team=True, from_adj=True,
             min_value=self.tournament.pref('adj_min_score'),
             max_value=self.tournament.pref('adj_max_score'),
@@ -114,8 +114,8 @@ class BasePrintFeedbackFormsView(RoundMixin, TemplateView):
         kwargs['ballots'] = json.dumps(ballots)
         kwargs['questions'] = json.dumps(self.questions_dict())
 
-        kwargs['team_questions_exist'] = self.tournament.adjudicatorfeedbackquestion_set.filter(from_team=True).exists()
-        kwargs['adj_questions_exist'] = self.tournament.adjudicatorfeedbackquestion_set.filter(from_adj=True).exists()
+        kwargs['team_questions_exist'] = AdjudicatorFeedbackQuestion.objects.filter(tournament=self.tournament, from_team=True).exists()
+        kwargs['adj_questions_exist'] = AdjudicatorFeedbackQuestion.objects.filter(tournament=self.tournament, from_adj=True).exists()
 
         return super().get_context_data(**kwargs)
 

@@ -1,9 +1,9 @@
 from django.conf import settings
+from django.test import Client
 from django.urls import reverse
 from dynamic_preferences.registries import global_preferences_registry
 from rest_framework.test import APITestCase
 
-from breakqual.models import BreakingTeam
 from utils.tests import CompletedTournamentTestMixin
 
 
@@ -16,6 +16,7 @@ class RootTests(APITestCase):
             "_links": {"v1": "http://testserver/api/v1"},
             "timezone": settings.TIME_ZONE,
             "version": settings.TABBYCAT_VERSION,
+            "version_name": settings.TABBYCAT_CODENAME,
         })
 
     def test_api_disabled_root(self):
@@ -116,6 +117,7 @@ class SpeakerEligibilityViewsetTests(CompletedTournamentTestMixin, APITestCase):
 
 
 class BreakingTeamsViewsetTests(CompletedTournamentTestMixin, APITestCase):
+    client_class = Client
 
     def test_get_breaking_teams(self):
         self.client.login(username="admin", password="admin")
@@ -136,6 +138,18 @@ class BreakingTeamsViewsetTests(CompletedTournamentTestMixin, APITestCase):
         self.client.login(username="admin", password="admin")
         response = self.client.patch(reverse('api-breakcategory-break', kwargs={'tournament_slug': self.tournament.slug, 'pk': 1}), {
             'team': 'http://testserver/api/v1/tournaments/demo/teams/7',
-            'remark': BreakingTeam.REMARK_WITHDRAWN,
+            'remark': 'w',
         }, content_type='application/json')
         self.assertEqual(len(response.data), 16)
+
+
+class BallotViewSetTests(CompletedTournamentTestMixin, APITestCase):
+
+    def test_access_with_user_auth(self):
+        self.client.login(username="admin", password="admin")
+        response = self.client.get(reverse('api-ballot-list', kwargs={'tournament_slug': self.tournament.slug, 'round_seq': 1, 'debate_pk': 12}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_access_with_private_url(self):
+        response = self.client.get(reverse('api-ballot-list', kwargs={'tournament_slug': self.tournament.slug, 'round_seq': 1, 'debate_pk': 12}), headers={"Authorization": "Key urlkey"})
+        self.assertEqual(response.status_code, 200)

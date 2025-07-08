@@ -11,6 +11,8 @@ from .permissions import APIEnabledPermission, IsAdminOrReadOnly, PerTournamentP
 
 
 class APILogActionMixin(LogActionMixin):
+    """
+    """
     action_log_content_object_attr = 'obj'
 
     def perform_create(self, serializer):
@@ -32,6 +34,10 @@ class TournamentAPIMixin(APILogActionMixin):
     access_setting = True
 
     @property
+    def model(self):
+        return self.get_serializer_class().Meta.model
+
+    @property
     def tournament(self):
         if not hasattr(self, "_tournament"):
             self._tournament = get_object_or_404(Tournament, slug=self.kwargs['tournament_slug'])
@@ -41,7 +47,7 @@ class TournamentAPIMixin(APILogActionMixin):
         return {self.tournament_field: self.tournament}
 
     def get_queryset(self):
-        return self.get_serializer_class().Meta.model.objects.filter(**self.lookup_kwargs()).select_related(self.tournament_field)
+        return self.model.objects.filter(**self.lookup_kwargs()).select_related(self.tournament_field)
 
     def get_serializer_context(self):
         context = super().get_serializer_context()

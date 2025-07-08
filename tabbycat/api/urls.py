@@ -74,6 +74,15 @@ urlpatterns = [
                         name='api-score-criteria-detail'),
                 ])),
 
+                path('/questions', include([
+                    path('',
+                        views.QuestionViewSet.as_view(list_methods),
+                        name='api-question-list'),
+                    path('/<int:pk>',
+                        views.QuestionViewSet.as_view(detail_methods),
+                        name='api-question-detail'),
+                ])),
+
                 path('/rounds', include([
                     path('',
                         views.RoundViewSet.as_view(list_methods),
@@ -92,6 +101,9 @@ urlpatterns = [
                             path('',
                                 views.PairingViewSet.as_view({'get': 'list', 'post': 'create', 'delete': 'delete_all'}),
                                 name='api-pairing-list'),
+                            path('/generate-draw',
+                                views.GeneratePairingView.as_view(),
+                                name='api-generate-pairing'),
                             path('/<int:debate_pk>', include([
                                 path('',
                                     views.PairingViewSet.as_view(detail_methods),
@@ -243,6 +255,10 @@ urlpatterns = [
                         name='api-group-detail'),
                 ])),
 
+                path('/me',
+                    views.ParticipantIdentificationView.as_view({'get': 'retrieve'}),
+                    name='api-tournament-detail'),
+
                 path('/', include(pref_router.urls)),  # Preferences
             ])),
         ])),
@@ -259,6 +275,9 @@ urlpatterns = [
             path('',
                 views.UserViewSet.as_view(list_methods),
                 name='api-user-list'),
+            path('/me',
+                views.OwnUserViewSet.as_view({'get': 'retrieve'}),
+                name='api-user-me'),
             path('/<int:pk>',
                 views.UserViewSet.as_view(detail_methods),
                 name='api-user-detail'),

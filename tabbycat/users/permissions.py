@@ -7,6 +7,7 @@ from django.utils.translation import gettext_lazy as _
 
 if TYPE_CHECKING:
     from django.conf import settings
+
     from tournaments.models import Tournament
 
 PERM_CACHE_KEY = "user_%d_%s_%s_permission"
@@ -86,13 +87,9 @@ class Permission(TextChoices):
     UNRELEASE_DRAW = 'unrelease.draw', _("unrelease draw to public")
     UNRELEASE_MOTION = 'unrelease.motion', _("unrelease motion to public")
     EDIT_STARTTIME = 'edit.starttime', _("add debate start time")
-    VIEW_DRAW = 'view.draw', _("view draws")
 
     VIEW_BRIEFING_DRAW = 'view.briefingdraw', _("view draws (for the briefing room)")
     DISPLAY_MOTION = 'display.motion', _("display motion (for the briefing room)")
-
-    VIEW_TOURNAMENTPREFERENCEMODEL = 'view.tournamentpreferencemodel', _("view tournament configuration")
-    EDIT_TOURNAMENTPREFERENCEMODEL = 'edit.tournamentpreferencemodel', _("edit tournament configuration")
 
     VIEW_PREFORMEDPANELS = 'view.preformedpanels', _("view existing preformed panels")
     EDIT_PREFORMEDPANELS = 'edit.preformedpanels', _("edit preformed panels")
@@ -107,7 +104,6 @@ class Permission(TextChoices):
 
     # Feedback tab
     VIEW_FEEDBACK_OVERVIEW = 'view.feedbackoverview', _("view overview of judge feedback")
-    EDIT_JUDGESCORES_BULK = 'edit.judgescoresbulk', _("bulk update judge scores")
     EDIT_BASEJUDGESCORES_IND = 'edit.judgescoresind', _("edit base scores of judges")
     VIEW_FEEDBACK = 'view.feedback', _("view feedback")
     EDIT_FEEDBACK_IGNORE = 'edit.feedbackignore', _("toggle ignore feedback")
@@ -116,8 +112,6 @@ class Permission(TextChoices):
     ADD_FEEDBACK = 'add.feedback', _("add feedback")
     VIEW_ADJ_BREAK = 'view.adj.break', _("view adjudicator break")
     EDIT_ADJ_BREAK = 'edit.adj.break', _("edit adjudicator break")
-    # idk if its possible for them to add feedback everywhere, considering there is add feedback on multiple pages
-
     EDIT_FEEDBACKQUESTION = 'edit.feedbackquestion', _("edit feedback questions")
 
     # breaks
@@ -134,10 +128,7 @@ class Permission(TextChoices):
     GENERATE_BREAK = 'generate.break', _("generate all breaks")
 
     VIEW_PRIVATE_URLS = 'view.privateurls', _("view private urls")
-    VIEW_PRIVATE_URLS_EMAIL_LIST = 'view.privateurls.emaillist', _("view private urls email list")
     GENERATE_PRIVATE_URLS = 'generate.privateurls', _("generate private URLs")
-    # need to get rid of generate private urls soons
-    SEND_PRIVATE_URLS = 'send.privateurls', _("send private URLs")
 
     VIEW_CHECKIN = 'view.checkin', _("view checkins")
     EDIT_PARTICIPANT_CHECKIN = 'edit.participantcheckin', _("edit participant check-in")
@@ -156,6 +147,16 @@ class Permission(TextChoices):
 
     VIEW_SETTINGS = 'view.settings', _("view settings")
     EDIT_SETTINGS = 'edit.settings', _("edit settings")
+
+    EDIT_QUESTIONS = 'edit.questions', _("edit general questions")
+    DELETE_QUESTIONS = 'delete.questions', _("delete general questions")
+    VIEW_CUSTOM_ANSWERS = 'view.answers', _("view answers to general questions")
+
+    # Schedule
+    EDIT_EVENTS = 'edit.events', _("edit events")
+    VIEW_EVENTS = 'view.events', _("view events")
+
+    VIEW_REGISTRATION = 'view.registration', _("view registration responses")
 
 
 permission_type = Union[Permission, bool]

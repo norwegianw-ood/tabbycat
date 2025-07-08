@@ -109,6 +109,12 @@ class ActionLogEntry(models.Model):
         VENUE_EDIT                        = 've.edit', _("Edited room")
         VENUES_AUTOALLOCATE               = 've.auto', _("Auto-allocated rooms")
         VENUES_SAVE                       = 've.save', _("Saved a room manual edit")
+        QUESTION_CREATE                   = 'qu.crea', _("Created question")
+        QUESTION_EDIT                     = 'qu.edit', _("Edited question")
+        INSTITUTION_REGISTER              = 'inst.reg', _("Registered institution")
+        TEAM_REGISTER                     = 'te.reg', _("Registered team")
+        ADJUDICATOR_REGISTER              = 'aj.reg', _("Registered adjudicator")
+        SPEAKER_REGISTER                  = 'sp.reg', _("Registered speaker")
 
     class Agent(models.TextChoices):
         API = 'a', _("API")
@@ -191,6 +197,7 @@ class ActionLogEntry(models.Model):
         return {
             'id': self.id,
             'user': self.user.username if self.user else self.ip_address or _("anonymous"),
+            'agent': self.agent,
             'type': self.get_type_display(),
             # As the team names are passed in the content of the message for all users,
             # must assume they don't have permission for real names

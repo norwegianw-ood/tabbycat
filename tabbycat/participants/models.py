@@ -10,6 +10,7 @@ from django.utils.functional import cached_property
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
+from registration.models import Answer
 from utils.managers import LookupByNameFieldsMixin
 from utils.models import UniqueConstraint
 
@@ -63,6 +64,40 @@ class Institution(models.Model):
         return str(self.name)
 
 
+class TournamentInstitution(models.Model):
+    tournament = models.ForeignKey(
+        "tournaments.Tournament", models.CASCADE, verbose_name=_("tournament"),
+    )
+    institution = models.ForeignKey(
+        Institution, models.CASCADE, verbose_name=_("institution"),
+    )
+    teams_requested = models.PositiveIntegerField(
+        verbose_name=_("Team slots requested"),
+        default=0,
+    )
+    teams_allocated = models.PositiveIntegerField(verbose_name=_("Team slots allocated"), default=0)
+    adjudicators_requested = models.PositiveIntegerField(
+        verbose_name=_("Adjudicator slots requested"),
+        default=0,
+    )
+    adjudicators_allocated = models.PositiveIntegerField(
+        verbose_name=_("Adjudicator slots allocated"),
+        default=0,
+    )
+
+    answers = GenericRelation(Answer)
+
+    class Meta:
+        constraints = [
+            UniqueConstraint(fields=['tournament', 'institution']),
+        ]
+        verbose_name = _("tournament institution")
+        verbose_name_plural = _("tournament institutions")
+
+    def __str__(self):
+        return "%s (%s)" % (self.institution.name, self.tournament.short_name)
+
+
 class SpeakerCategory(models.Model):
     tournament = models.ForeignKey('tournaments.Tournament', models.CASCADE,
         verbose_name=_("tournament"))
@@ -100,6 +135,8 @@ class SpeakerCategory(models.Model):
 class Person(models.Model):
     name = models.CharField(max_length=70, db_index=True,
         verbose_name=_("name"))
+    last_name = models.CharField(max_length=70, blank=True, null=True, verbose_name=_("last name"),
+        help_text=_("The last name may be used for team names or code names"))
     email = models.EmailField(blank=True, null=True,
         verbose_name=_("email address"))
     phone = models.CharField(max_length=40, blank=True,
@@ -127,6 +164,8 @@ class Person(models.Model):
         verbose_name=_("pronoun"),
         help_text=_("If printing ballots using Tabbycat, there is the option to pre-print pronouns"))
 
+    answers = GenericRelation(Answer)
+
     class Meta:
         verbose_name = _("person")
         verbose_name_plural = _("persons")
@@ -140,6 +179,29 @@ class Person(models.Model):
         if tournament.pref('participant_code_names') == 'off':
             return self.name
         return self.code_name
+
+
+class Coach(Person):
+    tournament_institution = models.ForeignKey(
+        TournamentInstitution,
+        models.CASCADE,
+        blank=True,
+        verbose_name=_("tournament institution"),
+    )
+
+    class Meta:
+        verbose_name = _("coach")
+        verbose_name_plural = _("coaches")
+
+    def __str__(self):
+        if self.tournament_institution.institution is None:
+            return self.name
+        else:
+            return "%s (%s)" % (self.name, self.tournament_institution.institution.code)
+
+    @property
+    def region(self):
+        return self.tournament_institution.institution.region if self.tournament_institution else None
 
 
 class TeamManager(LookupByNameFieldsMixin, models.Manager):
@@ -205,6 +267,8 @@ class Team(models.Model):
     emoji = models.CharField(max_length=3, default=None, choices=EMOJI_FIELD_CHOICES,
         blank=True, null=True,   # uses null=True to allow multiple teams to have no emoji
         verbose_name=_("emoji"))
+
+    answers = GenericRelation(Answer)
 
     class Meta:
         constraints = [
@@ -328,13 +392,13 @@ class Team(models.Model):
             errors['institution'] = _("Teams must have an institution if they are using the institutional prefix.")
         if not self.use_institution_prefix and not self.reference:
             errors['reference'] = _("Teams must have a full name if they don't use the institutional prefix.")
-        if not self.use_institution_prefix and not self.short_reference:
-            errors['short_reference'] = _("Teams must have a short name if they don't use the institutional prefix.")
         if errors:
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         # Override the short and long names before saving
+        if self.short_reference is None:
+            self.short_reference = self.reference[:35]
         self.short_name = self._construct_short_name()
         self.long_name = self._construct_long_name()
         super().save(*args, **kwargs)

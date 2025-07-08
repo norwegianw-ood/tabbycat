@@ -170,6 +170,7 @@ class BasePairDrawGenerator(BaseDrawGenerator):
         "pullup_debates_penalty": 0,
         "pairing_penalty"       : 0,
         "avoid_conflicts"       : "off",
+        "max_times_on_one_side" : 0,
     }
 
     TEAMS_IN_DEBATE = 2

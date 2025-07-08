@@ -10,11 +10,12 @@ from django.db.models import Count, Prefetch, Q
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 from dynamic_preferences.api.serializers import PreferenceSerializer
 from dynamic_preferences.api.viewsets import PerInstancePreferenceViewSet
-from rest_framework.exceptions import NotFound
+from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.fields import DateTimeField
-from rest_framework.generics import GenericAPIView, get_object_or_404, RetrieveUpdateAPIView
+from rest_framework.generics import CreateAPIView, GenericAPIView, get_object_or_404, RetrieveUpdateAPIView
 from rest_framework.mixins import ListModelMixin
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import BasePermission, IsAdminUser
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
@@ -23,7 +24,6 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from actionlog.models import ActionLogEntry
 from adjallocation.models import PreformedPanel
 from adjallocation.preformed.anticipated import calculate_anticipated_draw
-from adjfeedback.models import AdjudicatorFeedbackQuestion
 from availability.models import RoundAvailability
 from breakqual.models import BreakCategory
 from breakqual.views import GenerateBreakMixin
@@ -32,7 +32,7 @@ from checkins.models import Event
 from checkins.utils import create_identifiers, get_unexpired_checkins
 from draw.models import Debate, DebateTeam
 from options.models import TournamentPreferenceModel
-from participants.models import Adjudicator, Institution, Speaker, SpeakerCategory, Team
+from participants.models import Adjudicator, Institution, Person, Speaker, SpeakerCategory, Team
 from results.models import SpeakerScore, TeamScore
 from standings.speakers import SpeakerStandingsGenerator
 from standings.teams import TeamStandingsGenerator
@@ -44,7 +44,7 @@ from venues.models import Venue, VenueCategory
 from . import serializers
 from .fields import ParticipantAvailabilityForeignKeyField
 from .mixins import AdministratorAPIMixin, APILogActionMixin, PublicAPIMixin, RoundAPIMixin, TournamentAPIMixin, TournamentPublicAPIMixin
-from .permissions import APIEnabledPermission, PerTournamentPermissionRequired, PublicPreferencePermission
+from .permissions import APIEnabledPermission, PerTournamentPermissionRequired, PublicPreferencePermission, URLKeyAuthentication
 
 
 tournament_parameter = OpenApiParameter('tournament_slug', description="The tournament's slug", type=str, location="path")
@@ -72,6 +72,7 @@ class APIRootView(PublicAPIMixin, GenericAPIView):
             },
             "timezone": settings.TIME_ZONE,
             "version": settings.TABBYCAT_VERSION,
+            "version_name": settings.TABBYCAT_CODENAME,
         })
 
 
@@ -135,8 +136,8 @@ class TournamentPreferenceViewSet(TournamentFromUrlMixin, AdministratorAPIMixin,
     queryset = TournamentPreferenceModel.objects.all()
     serializer_class = PreferenceSerializer
 
-    list_permission = Permission.VIEW_TOURNAMENTPREFERENCEMODEL
-    update_permission = Permission.EDIT_TOURNAMENTPREFERENCEMODEL
+    list_permission = Permission.VIEW_SETTINGS
+    update_permission = Permission.EDIT_SETTINGS
 
     action_log_content_object_attr = 'obj'
     action_log_type_updated = ActionLogEntry.ActionType.OPTIONS_EDIT
@@ -365,6 +366,14 @@ class InstitutionViewSet(TournamentAPIMixin, TournamentPublicAPIMixin, ModelView
         if self.request.query_params.get('region'):
             filters &= Q(region__name=self.request.query_params['region'])
 
+        answers_prefetch = [
+            Prefetch(
+                typ,
+                queryset=getattr(self.model, typ).rel.model.objects.select_related('question__tournament'),
+            )
+            for typ in self.model.answer_rels
+        ]
+
         return Institution.objects.filter(
             Q(adjudicator__tournament=self.tournament) | Q(team__tournament=self.tournament),
             filters,
@@ -372,6 +381,7 @@ class InstitutionViewSet(TournamentAPIMixin, TournamentPublicAPIMixin, ModelView
             Prefetch('team_set', queryset=self.tournament.team_set.all()),
             Prefetch('adjudicator_set', queryset=self.tournament.adjudicator_set.all()),
             'venue_constraints__category__tournament',
+            *answers_prefetch,
         )
 
 
@@ -396,6 +406,21 @@ class TeamViewSet(TournamentAPIMixin, TournamentPublicAPIMixin, ModelViewSet):
     destroy_permission = Permission.ADD_TEAMS
 
     def get_queryset(self):
+        team_answers_prefetch = [
+            Prefetch(
+                typ,
+                queryset=getattr(self.model, typ).rel.model.objects.select_related('question__tournament'),
+            )
+            for typ in self.model.answer_rels
+        ]
+        spk_answers_prefetch = [
+            Prefetch(
+                typ,
+                queryset=getattr(Speaker, typ).rel.model.objects.select_related('question__tournament'),
+            )
+            for typ in Speaker.answer_rels
+        ]
+
         category_prefetch = Prefetch('categories', queryset=SpeakerCategory.objects.all().select_related('tournament'))
         if not self.request.user or not self.request.user.is_staff:
             category_prefetch.queryset = category_prefetch.queryset.filter(public=True)
@@ -403,8 +428,9 @@ class TeamViewSet(TournamentAPIMixin, TournamentPublicAPIMixin, ModelViewSet):
         return super().get_queryset().select_related('tournament').prefetch_related(
             Prefetch(
                 'speaker_set',
-                queryset=Speaker.objects.all().prefetch_related(category_prefetch).select_related('team__tournament', 'checkin_identifier'),
+                queryset=Speaker.objects.all().prefetch_related(category_prefetch, *spk_answers_prefetch).select_related('team__tournament', 'checkin_identifier'),
             ),
+            *team_answers_prefetch,
             'institution_conflicts', 'venue_constraints__category__tournament',
             'break_categories', 'break_categories__tournament',
         )
@@ -440,10 +466,19 @@ class AdjudicatorViewSet(TournamentAPIMixin, TournamentPublicAPIMixin, ModelView
         if self.request.query_params.get('break') and self.get_break_permission():
             filters &= Q(breaking=True)
 
+        answers_prefetch = [
+            Prefetch(
+                typ,
+                queryset=getattr(self.model, typ).rel.model.objects.select_related('question__tournament'),
+            )
+            for typ in self.model.answer_rels
+        ]
+
         return super().get_queryset().select_related('checkin_identifier').prefetch_related(
             'team_conflicts', 'team_conflicts__tournament',
             'adjudicator_conflicts', 'adjudicator_conflicts__tournament',
             'institution_conflicts', 'venue_constraints__category__tournament',
+            *answers_prefetch,
         ).filter(filters)
 
 
@@ -502,10 +537,19 @@ class SpeakerViewSet(TournamentAPIMixin, TournamentPublicAPIMixin, ModelViewSet)
 
     def get_queryset(self):
         category_prefetch = Prefetch('categories', queryset=SpeakerCategory.objects.all().select_related('tournament'))
+
+        answers_prefetch = [
+            Prefetch(
+                typ,
+                queryset=getattr(self.model, typ).rel.model.objects.select_related('question__tournament'),
+            )
+            for typ in self.model.answer_rels
+        ]
+
         if not self.request.user or not self.request.user.is_staff:
             category_prefetch.queryset = category_prefetch.queryset.filter(public=True)
 
-        return super().get_queryset().select_related('checkin_identifier').prefetch_related(category_prefetch)
+        return super().get_queryset().select_related('checkin_identifier').prefetch_related(category_prefetch, *answers_prefetch)
 
 
 @extend_schema(tags=['venues'], parameters=[tournament_parameter])
@@ -664,6 +708,26 @@ class BaseCheckinsView(AdministratorAPIMixin, TournamentAPIMixin, APIView):
         return Response(self.get_response_dict(request, obj.get(), False, None), status=status)
 
 
+class PersonCheckinMixin:
+    class CustomPermission(BasePermission):
+        def has_permission(self, request, view):
+            return (view.tournament.pref('public_checkins_submit') == 'private-urls' and view.participant_requester) or request.method != 'POST'
+
+    authentication_classes = [TokenAuthentication, SessionAuthentication, URLKeyAuthentication]
+    permission_classes = [APIEnabledPermission, PerTournamentPermissionRequired | CustomPermission]
+
+    @property
+    def participant_requester(self):
+        if isinstance(person := self.request.auth, Person):
+            return person
+
+    def get_queryset(self):
+        p_filter = Q()
+        if self.participant_requester.id is not None:
+            p_filter &= Q(id=self.participant_requester.id)
+        return super().get_queryset().filter(p_filter)
+
+
 @extend_schema(tags=['adjudicators'])
 @extend_schema_view(
     get=extend_schema(summary="Get adjudicator checkin status"),
@@ -672,7 +736,7 @@ class BaseCheckinsView(AdministratorAPIMixin, TournamentAPIMixin, APIView):
     patch=extend_schema(summary="Toggle adjudicator checkin status"),
     post=extend_schema(summary="Create adjudicator checkin identifier"),
 )
-class AdjudicatorCheckinsView(BaseCheckinsView):
+class AdjudicatorCheckinsView(PersonCheckinMixin, BaseCheckinsView):
     model = Adjudicator
     object_api_view = 'api-adjudicator-detail'
     window_preference_pref = 'checkin_window_people'
@@ -686,7 +750,7 @@ class AdjudicatorCheckinsView(BaseCheckinsView):
     patch=extend_schema(summary="Toggle speaker checkin status"),
     post=extend_schema(summary="Create speaker checkin identifier"),
 )
-class SpeakerCheckinsView(BaseCheckinsView):
+class SpeakerCheckinsView(PersonCheckinMixin, BaseCheckinsView):
     model = Speaker
     object_api_view = 'api-speaker-detail'
     window_preference_pref = 'checkin_window_people'
@@ -903,7 +967,7 @@ class TeamRoundStandingsRoundsView(TournamentAPIMixin, TournamentPublicAPIMixin,
 )
 class PairingViewSet(RoundAPIMixin, ModelViewSet):
 
-    class Permission(PublicPreferencePermission):
+    class CustomPermission(PublicPreferencePermission):
         def get_tournament_preference(self, view, op):
             t = view.tournament
             r = view.round
@@ -928,12 +992,12 @@ class PairingViewSet(RoundAPIMixin, ModelViewSet):
     round_released_field = 'draw_status'
     round_released_value = Round.Status.RELEASED
 
-    """list_permission = Permission.VIEW_DEBATE
+    list_permission = Permission.VIEW_DEBATE
     create_permission = Permission.GENERATE_DEBATE
-    update_permission = Permission.GENERATE_DEBATE
-    destroy_permission = Permission.GENERATE_DEBATE"""
+    # update_permission = Permission.EDIT_DEBATETEAMS
+    destroy_permission = Permission.DELETE_DEBATE
 
-    permission_classes = [APIEnabledPermission, Permission | PerTournamentPermissionRequired]
+    permission_classes = [APIEnabledPermission, CustomPermission | PerTournamentPermissionRequired]
 
     action_log_type_created = ActionLogEntry.ActionType.DEBATE_CREATE
     action_log_type_updated = ActionLogEntry.ActionType.DEBATE_EDIT
@@ -951,6 +1015,31 @@ class PairingViewSet(RoundAPIMixin, ModelViewSet):
         return Response(status=204)  # No content
 
 
+@extend_schema(
+    tags=['debates'],
+    parameters=round_parameters,
+    request=serializers.DrawGenerationSerializer,
+    responses={201: serializers.RoundPairingSerializer(many=True)},
+    summary="Generate draw for round",
+)
+class GeneratePairingView(RoundAPIMixin, AdministratorAPIMixin, CreateAPIView):
+    create_permission = Permission.GENERATE_DEBATE
+    serializer_class = serializers.DrawGenerationSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        draw = self.perform_create(serializer)
+        response_serializer = serializers.RoundPairingSerializer(draw, many=True)
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(response_serializer.data, status=201, headers=headers)
+
+    def perform_create(self, serializer):
+        return serializer.save()
+
+
 @extend_schema(tags=['results'], parameters=debate_parameters)
 @extend_schema_view(
     list=extend_schema(summary="Get debate ballots", parameters=[
@@ -962,11 +1051,23 @@ class PairingViewSet(RoundAPIMixin, ModelViewSet):
     partial_update=extend_schema(summary="Patch ballot", parameters=[id_parameter], request=serializers.UpdateBallotSerializer),
 )
 class BallotViewSet(RoundAPIMixin, TournamentPublicAPIMixin, ModelViewSet):
+
+    class CustomPermission(BasePermission):
+        def has_permission(self, request, view):
+            return (
+                (view.action in ['list', 'retrieve', 'create'] and view.tournament.pref('participant_ballots') == 'private-urls' and view.participant_requester) or
+                (view.action == 'create' and view.tournament.pref('participant_ballots') == 'public') or
+                (view.action in ['list', 'retrieve'] and view.tournament.pref('private_ballots_released') is True)
+            )
+
     serializer_class = serializers.BallotSerializer
     access_preference = 'ballots_released'
 
     tournament_field = 'debate__round__tournament'
     round_field = 'debate__round'
+
+    authentication_classes = [TokenAuthentication, SessionAuthentication, URLKeyAuthentication]
+    permission_classes = [APIEnabledPermission, PerTournamentPermissionRequired | PublicPreferencePermission | CustomPermission]
 
     list_permission = Permission.VIEW_BALLOTSUBMISSIONS
     create_permission = Permission.ADD_BALLOTSUBMISSIONS
@@ -975,6 +1076,23 @@ class BallotViewSet(RoundAPIMixin, TournamentPublicAPIMixin, ModelViewSet):
 
     action_log_type_created = ActionLogEntry.ActionType.BALLOT_CREATE
     action_log_type_updated = ActionLogEntry.ActionType.BALLOT_EDIT
+
+    @property
+    def participant_requester(self):
+        if isinstance(person := self.request.auth, Person):
+            try:
+                return person.adjudicator
+            except Adjudicator.DoesNotExist:
+                if self.action == 'create':
+                    raise PermissionDenied('URL key for submitting ballot must be for an adjudicator')
+                else:
+                    return person.speaker.team
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['participant_requester'] = self.participant_requester
+        context['debate'] = self.debate
+        return context
 
     @property
     def debate(self):
@@ -987,16 +1105,11 @@ class BallotViewSet(RoundAPIMixin, TournamentPublicAPIMixin, ModelViewSet):
     def lookup_kwargs(self):
         return {'debate': self.debate}
 
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        context['debate'] = self.debate
-        return context
-
     def get_queryset(self):
         filters = Q()
 
         if isinstance(self.participant_requester, Adjudicator):
-            filters &= Q(debate__debateadjudicator_set__adjudicator_id=self.participant_requester.id)
+            filters &= Q(debate__debateadjudicator__adjudicator_id=self.participant_requester.id)
         if isinstance(self.participant_requester, Team):
             filters &= Q(debate__debateteam_set__team_id=self.participant_requester.id)
 
@@ -1017,6 +1130,26 @@ class BallotViewSet(RoundAPIMixin, TournamentPublicAPIMixin, ModelViewSet):
         instance.save()
         self.log_action(ActionLogEntry.ActionType.BALLOT_DISCARD)
         return self.retrieve(request, *args, **kwargs)
+
+
+@extend_schema(tags=['questions'], parameters=[tournament_parameter])
+@extend_schema_view(
+    list=extend_schema(summary="List tournament questions"),
+    create=extend_schema(summary="Create question"),
+    retrieve=extend_schema(summary="Get question", parameters=[id_parameter]),
+    update=extend_schema(summary="Update question", parameters=[id_parameter]),
+    partial_update=extend_schema(summary="Patch question", parameters=[id_parameter]),
+    destroy=extend_schema(summary="Delete question", parameters=[id_parameter]),
+)
+class QuestionViewSet(TournamentAPIMixin, PublicAPIMixin, ModelViewSet):
+    serializer_class = serializers.QuestionSerializer
+    action_log_type_created = ActionLogEntry.ActionType.QUESTION_CREATE
+    action_log_type_updated = ActionLogEntry.ActionType.QUESTION_EDIT
+
+    list_permission = True
+    create_permission = Permission.EDIT_QUESTIONS
+    update_permission = Permission.EDIT_QUESTIONS
+    destroy_permission = Permission.DELETE_QUESTIONS
 
 
 @extend_schema(tags=['feedback'], parameters=[tournament_parameter])
@@ -1065,15 +1198,39 @@ class FeedbackQuestionViewSet(TournamentAPIMixin, PublicAPIMixin, ModelViewSet):
     destroy=extend_schema(summary="Delete feedback", parameters=[id_parameter]),
 )
 class FeedbackViewSet(TournamentAPIMixin, AdministratorAPIMixin, ModelViewSet):
+
+    class CustomPermission(BasePermission):
+        def has_permission(self, request, view):
+            return (
+                (view.action in ['list', 'retrieve', 'create'] and view.tournament.pref('participant_feedback') == 'private-urls' and view.participant_requester) or
+                (view.action == 'create' and view.tournament.pref('participant_feedback') == 'public')
+            )
+
     serializer_class = serializers.FeedbackSerializer
     tournament_field = 'adjudicator__tournament'
     action_log_type_created = ActionLogEntry.ActionType.FEEDBACK_SAVE
     action_log_type_updated = ActionLogEntry.ActionType.FEEDBACK_SAVE
 
+    authentication_classes = [TokenAuthentication, SessionAuthentication, URLKeyAuthentication]
+    permission_classes = [APIEnabledPermission, PerTournamentPermissionRequired | CustomPermission]
+
     list_permission = Permission.VIEW_FEEDBACK
     create_permission = Permission.ADD_FEEDBACK
     update_permission = Permission.EDIT_FEEDBACK_IGNORE
     destroy_permission = Permission.EDIT_FEEDBACK_CONFIRM
+
+    @property
+    def participant_requester(self):
+        if isinstance(person := self.request.auth, Person):
+            try:
+                return person.adjudicator
+            except Adjudicator.DoesNotExist:
+                return person.speaker.team
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['participant_requester'] = self.participant_requester
+        return context
 
     def perform_create(self, serializer):
         self.obj = serializer.save()
@@ -1082,6 +1239,12 @@ class FeedbackViewSet(TournamentAPIMixin, AdministratorAPIMixin, ModelViewSet):
     def get_queryset(self):
         query_params = self.request.query_params
         filters = Q()
+
+        # Disallow querying for feedback that they didn't submit
+        if (person := self.participant_requester) is not None:
+            if self.action == 'list' and (query_params.get('source_type') != type(person).__name__.lower() or query_params.get('source') != str(person.id)):
+                raise PermissionDenied("URL key-authorized requests may only get the participants' objects")
+
         if query_params.get('source_type') == 'adjudicator':
             filters &= Q(source_team__isnull=True)
             if query_params.get('source'):
@@ -1098,10 +1261,10 @@ class FeedbackViewSet(TournamentAPIMixin, AdministratorAPIMixin, ModelViewSet):
 
         answers_prefetch = [
             Prefetch(
-                typ.__name__.lower() + "_set",
-                queryset=typ.objects.all().select_related('question', 'question__tournament'),
+                typ,
+                queryset=getattr(self.model, typ).rel.model.objects.select_related('question__tournament'),
             )
-            for typ in AdjudicatorFeedbackQuestion.ANSWER_TYPE_CLASSES_REVERSE.keys()
+            for typ in self.model.answer_rels
         ]
         return super().get_queryset().filter(filters).select_related(
             'adjudicator', 'adjudicator__tournament',
@@ -1118,6 +1281,7 @@ class FeedbackViewSet(TournamentAPIMixin, AdministratorAPIMixin, ModelViewSet):
 class AvailabilitiesViewSet(RoundAPIMixin, AdministratorAPIMixin, APIView):
     serializer_class = serializers.AvailabilitiesSerializer  # Isn't actually used
     action_log_type_updated = ActionLogEntry.ActionType.AVAIL_SAVE
+    action_log_content_object_attr = None
 
     list_permission = Permission.VIEW_ROUNDAVAILABILITIES
     create_permission = Permission.EDIT_ROUNDAVAILABILITIES
@@ -1277,6 +1441,21 @@ class UserViewSet(AdministratorAPIMixin, ModelViewSet):
         instance.save()
 
 
+@extend_schema(tags=['users'])
+@extend_schema_view(
+    retrieve=extend_schema(summary="Get own user information", parameters=[id_parameter]),
+)
+class OwnUserViewSet(UserViewSet):
+    serializer_class = serializers.UserSerializer
+    list_permission = True
+
+    def get_object(self):
+        queryset = self.filter_queryset(self.get_queryset())
+        obj = get_object_or_404(queryset, pk=self.request.user.pk)
+        obj.tournaments = get_permissions(obj)
+        return obj
+
+
 @extend_schema(tags=['users'], parameters=[tournament_parameter])
 @extend_schema_view(
     list=extend_schema(summary="List all permission groups in tournament"),
@@ -1301,3 +1480,15 @@ class GroupViewSet(TournamentAPIMixin, AdministratorAPIMixin, ModelViewSet):
 )
 class ScoreCriterionViewSet(TournamentAPIMixin, PublicAPIMixin, ModelViewSet):
     serializer_class = serializers.ScoreCriterionSerializer
+
+
+@extend_schema(tags=['participants'])
+@extend_schema_view(
+    retrieve=extend_schema(summary="Get participant from private URL key", parameters=[id_parameter]),
+)
+class ParticipantIdentificationView(TournamentAPIMixin, ModelViewSet):
+    serializer_class = serializers.ParticipantIdentificationSerializer
+    authentication_classes = [URLKeyAuthentication]
+
+    def get_object(self):
+        return self.request.auth

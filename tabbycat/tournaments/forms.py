@@ -1,5 +1,6 @@
+from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
-from django.forms import CharField, ChoiceField, Form, ModelChoiceField, ModelForm
+from django.forms import CharField, ChoiceField, DateTimeInput, Form, HiddenInput, ModelChoiceField, ModelForm
 from django.forms.fields import IntegerField, NumberInput
 from django.forms.models import ModelChoiceIterator
 from django.utils.html import escape
@@ -15,7 +16,7 @@ from options.presets import all_presets, data_entry_presets_for_form, presets_fo
 from users.groups import all_groups
 from users.models import Group
 
-from .models import Round, Tournament
+from .models import Round, ScheduleEvent, Tournament
 from .signals import update_tournament_cache
 from .utils import auto_make_rounds
 
@@ -38,17 +39,20 @@ class TournamentStartForm(ModelForm):
 
     @staticmethod
     def add_default_feedback_questions(tournament):
+        content_type = ContentType.objects.get(app_label="adjfeedback", model="adjudicatorfeedback")
         agree = AdjudicatorFeedbackQuestion(
             tournament=tournament, seq=2, required=True,
+            for_content_type=content_type,
             text=_("Did you agree with their decision?"), name=_("Agree?"),
             reference="agree", from_adj=True, from_team=True,
-            answer_type=AdjudicatorFeedbackQuestion.ANSWER_TYPE_BOOLEAN_SELECT)
+            answer_type=AdjudicatorFeedbackQuestion.AnswerType.BOOLEAN_SELECT)
         agree.save()
         comments = AdjudicatorFeedbackQuestion(
             tournament=tournament, seq=3, required=False,
+            for_content_type=content_type,
             text=_("Comments"), name=_("Comments"),
             reference="comments", from_adj=True, from_team=True,
-            answer_type=AdjudicatorFeedbackQuestion.ANSWER_TYPE_LONGTEXT)
+            answer_type=AdjudicatorFeedbackQuestion.AnswerType.LONGTEXT)
         comments.save()
 
     @staticmethod
@@ -291,3 +295,20 @@ class RoundWeightForm(Form):
         Round.objects.bulk_update(rounds, ['weight'])
 
         return rounds
+
+
+class ScheduleEventForm(ModelForm):
+
+    def __init__(self, tournament, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['tournament'].initial = tournament
+        self.fields['round'].queryset = tournament.round_set.all()
+
+    class Meta:
+        model = ScheduleEvent
+        fields = ('tournament', 'type', 'title', 'start_time', 'end_time', 'round')
+        widgets = {
+            'tournament': HiddenInput(),
+            'start_time': DateTimeInput(attrs={'type': 'datetime-local'}),
+            'end_time':   DateTimeInput(attrs={'type': 'datetime-local'}),
+        }

@@ -1,11 +1,13 @@
 from decimal import Decimal
 
-from django.core.validators import MinValueValidator, validate_slug
+from django.core.validators import EmailValidator, MinValueValidator, validate_slug
+from django.forms import SelectMultiple
 from django.utils.translation import gettext_lazy as _
 from django_summernote.widgets import SummernoteWidget
 from dynamic_preferences.preferences import Section
 from dynamic_preferences.registries import global_preferences_registry
-from dynamic_preferences.types import BooleanPreference, ChoicePreference, DecimalPreference, FloatPreference, IntegerPreference, LongStringPreference, StringPreference
+from dynamic_preferences.types import (BooleanPreference, ChoicePreference, DecimalPreference, FloatPreference,
+    IntegerPreference, LongStringPreference, MultipleChoicePreference, StringPreference)
 
 from standings.speakers import SpeakerStandingsGenerator
 from standings.teams import TeamStandingsGenerator
@@ -14,7 +16,6 @@ from tournaments.utils import get_side_name_choices
 from .models import tournament_preferences_registry
 from .types import MultiValueChoicePreference
 from .utils import validate_metric_duplicates
-
 
 # ==============================================================================
 scoring = Section('scoring', verbose_name=_("Score Rules"))
@@ -92,6 +93,17 @@ class MarginIncludesDissent(BooleanPreference):
     section = scoring
     name = 'margin_includes_dissenters'
     default = False
+
+
+@tournament_preferences_registry.register
+class BallotIntroduction(LongStringPreference):
+    help_text = _("Any explanatory text needed to introduce the ballot form, e.g. speaker scale")
+    verbose_name = _("Ballot introduction/explanation")
+    section = scoring
+    name = 'ballot_introduction'
+    default = ''
+    widget = SummernoteWidget(attrs={'height': 150, 'class': 'form-summernote'})
+    field_kwargs = {'required': False}
 
 
 @tournament_preferences_registry.register
@@ -208,6 +220,17 @@ class PairingPenalty(IntegerPreference):
 
 
 @tournament_preferences_registry.register
+class MaxTimesPerSide(IntegerPreference):
+    help_text = _("Hard preference applied by minimum cost matching to disallow pairings where a team would debate\
+                   more than this many times on the same side. WARNING: if you set this to a low value, the draw\
+                   algorithm may be unable to find a valid draw.")
+    verbose_name = _("Maximum number of times per side")
+    section = draw_rules
+    name = 'max_times_per_side'
+    default = 5
+
+
+@tournament_preferences_registry.register
 class DrawOddBracket(ChoicePreference):
     help_text = _("How odd brackets are resolved (see documentation for further details)")
     verbose_name = _("Odd bracket resolution method")
@@ -222,6 +245,8 @@ class DrawOddBracket(ChoicePreference):
         ('intermediate_bubble_up_down', _("Intermediate brackets with bubble-up-bubble-down")),
         ('intermediate1', _("Intermediate 1 (pre-allocated sides)")),
         ('intermediate2', _("Intermediate 2 (pre-allocated sides)")),
+        ('pullup_lowest_ds_rank', _("Pull up from the lowest draw strength by rank")),
+        ('pullup_lowest_ds_rank_npulls', _("Pull up from the least pulled up, then the lowest draw strength by rank")),
     )
     default = 'intermediate_bubble_up_down'
 
@@ -267,7 +292,8 @@ class DrawAvoidConflicts(ChoicePreference):
     choices = (
         ('off', _("Off")),
         ('one_up_one_down', _("One-up-one-down")),
-        ('graph', _("Minimum cost matching")),
+        ('graph', _("Minimum cost matching (pullups determined beforehand)")),
+        ('graph_one', _("Minimum cost matching (including pullups)")),
     )
     default = 'one_up_one_down'
 
@@ -286,6 +312,15 @@ class DrawPullupRestriction(ChoicePreference):
         ('lowest_ds_speaks', _("Choose from teams with the lowest draw strength by speaks so far")),
     )
     default = 'none'
+
+
+@tournament_preferences_registry.register
+class DrawPullupPenalty(IntegerPreference):
+    help_text = _("Penalty applied when determining which teams to pull up (for minimum cost matching)")
+    verbose_name = _("Pullup penalty")
+    section = draw_rules
+    name = 'draw_pullup_penalty'
+    default = 0
 
 
 @tournament_preferences_registry.register
@@ -409,6 +444,17 @@ class ByeTeamSelection(ChoicePreference):
     default = 'off'
 
 
+@tournament_preferences_registry.register
+class MaximumSideImbalance(IntegerPreference):
+    help_text = _("A limit for the side imbalance, where a pairing will not be made if "
+        "that requires a team to debate more times on one side than the selected number. For use with the graph generator, with 0 as disabled.")
+    verbose_name = _("Maximum allowed side imbalance")
+    section = draw_rules
+    name = 'max_times_on_one_side'
+    default = 0
+    field_kwargs = {'validators': [MinValueValidator(0)]}
+
+
 # ==============================================================================
 feedback = Section('feedback', verbose_name=_("Feedback"))
 # ==============================================================================
@@ -441,7 +487,7 @@ class FeedbackPaths(ChoicePreference):
     choices = (
         ('minimal', _("Chairs on panellists and trainees")),
         ('with-p-on-c', _("Panellists on chairs, chairs on panellists and trainees")),
-        ('with-t-on-c', _("Panellists and trainees on chairs, vice-versa")),
+        ('with-t-on-c', _("Panellists and trainees on chairs, chairs on panellists and trainees")),
         ('all-adjs', _("All adjudicators (including trainees) on each other")),
         ('with-p-on-p', _("Panellists on eachother and chairs, trainees on chairs, chairs on everyone")),
         ('no-adjs', _("Neither chairs, nor panellists nor trainees")),
@@ -621,6 +667,17 @@ class PreparationTime(IntegerPreference):
     default = -1
 
 
+@tournament_preferences_registry.register
+class EnableForfeits(BooleanPreference):
+    help_text = _(
+        "Whether there should be an option in ballot forms to mark a team as having forfeitted "
+        "a round, rendering the debate win/loss without speaker scores")
+    verbose_name = _("Enable forfeits")
+    section = debate_rules
+    name = 'enable_forfeits'
+    default = False
+
+
 # ==============================================================================
 standings = Section('standings', verbose_name=_("Standings"))
 # ==============================================================================
@@ -666,7 +723,7 @@ class TeamStandingsExtraMetrics(MultiValueChoicePreference):
     verbose_name = _("Team standings extra metrics")
     section = standings
     name = 'team_standings_extra_metrics'
-    choices = TeamStandingsGenerator.get_metric_choices(ranked_only=False)
+    choices = TeamStandingsGenerator.get_metric_choices(ranked_only=False, for_extra=True)
     nfields = 5
     allow_empty = True
     default = []
@@ -694,7 +751,7 @@ class SpeakerStandingsExtraMetrics(MultiValueChoicePreference):
     verbose_name = _("Speaker standings extra metrics")
     section = standings
     name = 'speaker_standings_extra_metrics'
-    choices = SpeakerStandingsGenerator.get_metric_choices(ranked_only=False)
+    choices = SpeakerStandingsGenerator.get_metric_choices(ranked_only=False, for_extra=True)
     nfields = 5
     allow_empty = True
     default = ['stdev', 'count']
@@ -1003,6 +1060,21 @@ public_features = Section('public_features', verbose_name=_("Public Features"))
 
 
 @tournament_preferences_registry.register
+class AllowSearchEngineIndexing(ChoicePreference):
+    help_text = _("Adds a flag signaling search engines to not include tournament pages in search results."
+                  "Note that it may get ignored, and the other available settings will provide greater privacy.")
+    verbose_name = _("Include site in search engines")
+    section = public_features
+    name = 'search_engine_indexing'
+    choices = (
+        ('all', _("Allow all pages to be indexed by search engines.")),
+        ('homepage-only', _("Only allow the homepage to be indexed, do not allow any other pages (e.g. tabs, ballots, etc).")),
+        ('none', _("Do not allow any pages to be indexed by search engines.")),
+    )
+    default = 'all'
+
+
+@tournament_preferences_registry.register
 class PublicParticipants(BooleanPreference):
     help_text = _("Enables the public page listing all participants in the tournament")
     verbose_name = _("Enable public view of participants list")
@@ -1132,6 +1204,15 @@ class FeedbackProgress(BooleanPreference):
     verbose_name = _("Enable public view of unsubmitted feedback")
     section = public_features
     name = 'feedback_progress'
+    default = False
+
+
+@tournament_preferences_registry.register
+class PublicSchedule(BooleanPreference):
+    help_text = _("Enables the public page showing the schedule")
+    verbose_name = _("Enable public view of shedule")
+    section = public_features
+    name = 'public_schedule'
     default = False
 
 
@@ -1273,6 +1354,7 @@ class ReplyToEmailAddress(StringPreference):
     section = email
     name = 'reply_to_address'
     default = ""
+    field_kwargs = {'validators': [EmailValidator()]}
 
 
 @tournament_preferences_registry.register
@@ -1511,3 +1593,171 @@ class EnableAPIAccess(BooleanPreference):
     section = global_settings
     name = 'enable_api'
     default = True
+
+
+# ==============================================================================
+registration = Section('registration', verbose_name=_('Registration'))
+# ==============================================================================
+
+
+@tournament_preferences_registry.register
+class SpeakersInTeam(IntegerPreference):
+    help_text = _("How many speakers should each team have")
+    verbose_name = _("Speakers per team")
+    section = registration
+    name = 'speakers_in_team'
+    default = 3
+
+
+@tournament_preferences_registry.register
+class AutomaticTeamName(ChoicePreference):
+    help_text = _("How should team names be assigned")
+    verbose_name = _("Team name standard")
+    section = registration
+    name = 'team_name_generator'
+    default = 'user'
+    choices = (
+        ('user', _("Assigned by user")),
+        ('alphabetical', _("Alphabetical (Team A, Team B, ...)")),
+        ('numerical', _("Numerical (Team 1, Team 2, ...)")),
+        ('initials', _("Speaker initials (Team CZ, Team BT, ...)")),
+    )
+
+
+@tournament_preferences_registry.register
+class TeamRegistrationFields(MultipleChoicePreference):
+    help_text = _("Which fields should teams be allowed to submit, in addition to fields with handling through other settings.")
+    verbose_name = _("Customizable team fields")
+    section = registration
+    name = 'reg_team_fields'
+    default = ('use_institution_prefix', 'emoji')
+    choices = (
+        ('use_institution_prefix', _('Prefix name with institution')),
+        ('break_categories', _("Break categories")),
+        ('seed', _("Seed")),
+        ('emoji', _("Emoji")),
+    )
+    widget = SelectMultiple(attrs={'size': 5})
+
+
+@tournament_preferences_registry.register
+class SpeakerRegistrationFields(MultipleChoicePreference):
+    help_text = _("Which fields should speakers submit, in addition to fields with handling through other settings.")
+    verbose_name = _("Customizable speaker fields")
+    section = registration
+    name = 'reg_speaker_fields'
+    default = ('email',)
+    choices = (
+        ('email', _("Email address")),
+        ('phone', _("Phone number")),
+        ('gender', _("Gender")),
+        ('categories', _("Public speaker categories")),
+    )
+    widget = SelectMultiple(attrs={'size': 5})
+
+
+@tournament_preferences_registry.register
+class AdjudicatorRegistrationFields(MultipleChoicePreference):
+    help_text = _("Which fields should adjudicators be allowed to submit")
+    verbose_name = _("Customizable adjudicator fields")
+    section = registration
+    name = 'reg_adjudicator_fields'
+    default = ('email',)
+    choices = (
+        ('email', _("Email address")),
+        ('phone', _("Phone number")),
+        ('gender', _("Gender")),
+    )
+    widget = SelectMultiple(attrs={'size': 5})
+
+
+@tournament_preferences_registry.register
+class EnableInstitutionRegistration(BooleanPreference):
+    help_text = _("Allow institutions to register for the tournament")
+    verbose_name = _("Enable institutional registration")
+    section = registration
+    name = 'institution_registration'
+    default = False
+
+
+@tournament_preferences_registry.register
+class EnableInstitutionParticipantRegistration(BooleanPreference):
+    help_text = _("Allow institutions to register participants (up to their allocated slots)")
+    verbose_name = _("Enable institutional participant registration")
+    section = registration
+    name = 'institution_participant_registration'
+    default = False
+
+
+@tournament_preferences_registry.register
+class ParticipantSlots(BooleanPreference):
+    help_text = _("Whether to require institutions to declare the number of teams and adjudicators it wishes to send with approval required before registering.")
+    verbose_name = _("Use participant slots")
+    section = registration
+    name = 'reg_institution_slots'
+    default = False
+
+
+@tournament_preferences_registry.register
+class EnableOpenTeamRegistration(BooleanPreference):
+    help_text = _("Allow teams to register independently to an institution")
+    verbose_name = _("Enable open team registration")
+    section = registration
+    name = 'open_team_registration'
+    default = False
+
+
+@tournament_preferences_registry.register
+class EnableOpenAdjRegistration(BooleanPreference):
+    help_text = _("Allow adjudicators to register independently to an institution")
+    verbose_name = _("Enable open adjudicator registration")
+    section = registration
+    name = 'open_adj_registration'
+    default = False
+
+
+@tournament_preferences_registry.register
+class CodeNameGenerator(ChoicePreference):
+    help_text = _("If using code names, how should they be generated")
+    verbose_name = _("Code name standard")
+    section = registration
+    name = 'code_name_generator'
+    choices = (
+        ('user', _("Assigned by user")),
+        ('emoji', _("Emojis")),
+        ('last_names', _("Last names (e.g. 'Jones & Smith')")),
+    )
+    default = 'emoji'
+
+
+@tournament_preferences_registry.register
+class InstitutionRegisterMessage(LongStringPreference):
+    help_text = _("Message to be displayed on the institution registration form")
+    verbose_name = _("Institution register message")
+    section = registration
+    name = 'institution_register_message'
+    default = ""
+    widget = SummernoteWidget(attrs={'height': 150, 'class': 'form-summernote'})
+    field_kwargs = {'required': False}
+
+
+@tournament_preferences_registry.register
+class AdjudicatorRegisterMessage(LongStringPreference):
+    help_text = _("Message to be displayed on the adjudicator registration form")
+    verbose_name = _("Adjudicator register message")
+    section = registration
+    name = 'adjudicator_register_message'
+    default = ""
+    widget = SummernoteWidget(attrs={'height': 150, 'class': 'form-summernote'})
+    field_kwargs = {'required': False}
+
+
+@tournament_preferences_registry.register
+class TeamRegisterMessage(LongStringPreference):
+    help_text = _("Message to be displayed on the team registration form")
+    verbose_name = _("Team register message")
+    section = registration
+    name = 'team_register_message'
+    default = ""
+    widget = SummernoteWidget(attrs={'height': 150, 'class': 'form-summernote'})
+    field_kwargs = {'required': False}

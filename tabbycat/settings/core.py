@@ -22,9 +22,9 @@ SECRET_KEY = r'#2q43u&tp4((4&m3i8v%w-6z6pp7m(v0-6@w@i!j5n)n15epwc'
 # Version
 # ==============================================================================
 
-TABBYCAT_VERSION = '2.9.3'
-TABBYCAT_CODENAME = 'Ragdoll'
-READTHEDOCS_VERSION = 'v2.9.3'
+TABBYCAT_VERSION = '2.10.0'
+TABBYCAT_CODENAME = 'Sphynx'
+READTHEDOCS_VERSION = 'v2.10.0'
 
 # ==============================================================================
 # Internationalization and Localization
@@ -135,6 +135,7 @@ TABBYCAT_APPS = (
     'standings',
     'notifications',
     'importer',
+    'registration',
 )
 
 INSTALLED_APPS = (

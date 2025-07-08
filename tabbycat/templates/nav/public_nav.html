@@ -185,6 +185,11 @@
     <a class="nav-link" href="{% tournamenturl 'public_feedback_progress' %}">{% trans "Feedback Progress" %}</a>
   </li>
 {% endif %}
+{% if pref.public_schedule %}
+<li class="nav-item {% if schedule_nav %}active{% endif %}">
+  <a class="nav-link" href="{% tournamenturl 'tournament-public-schedule' %}">{% trans "Schedule" %}</a>
+</li>
+{% endif %}
 {% if pref.participant_ballots == 'public' %}
   {% if tournament.current_rounds|length == 1 %}
     <li class="nav-item {% if enter_ballots_nav %}active{% endif %}">

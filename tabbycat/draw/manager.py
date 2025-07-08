@@ -18,6 +18,7 @@ from .types import DebateSide
 
 if TYPE_CHECKING:
     from participants.models import Team
+
     from .generator.pairing import BasePairing
 
 logger = logging.getLogger(__name__)
@@ -35,16 +36,20 @@ OPTIONS_TO_CONFIG_MAPPING = {
     "odd_bracket"           : "draw_rules__draw_odd_bracket",
     "pairing_method"        : "draw_rules__draw_pairing_method",
     "pullup_restriction"    : "draw_rules__draw_pullup_restriction",
+    "max_times_per_side"    : "draw_rules__max_times_per_side",
     "pullup"                : "draw_rules__bp_pullup_distribution",
     "position_cost"         : "draw_rules__bp_position_cost",
     "assignment_method"     : "draw_rules__bp_assignment_method",
     "renyi_order"           : "draw_rules__bp_renyi_order",
     "exponent"              : "draw_rules__bp_position_cost_exponent",
+    "max_times_on_one_side" : "draw_rules__max_times_per_side",
+    "pullup_penalty"        : "draw_rules__draw_pullup_penalty",
 }
 
 
-def DrawManager(round, active_only=True):  # noqa: N802 (factory function)
+def DrawManager(round: Round, active_only: bool = True, draw_type: Round.DrawType | str | None = None):  # noqa: N802 (factory function)
     teams_in_debate = round.tournament.pref('teams_in_debate')
+    draw_type = draw_type or round.draw_type
     try:
         if teams_in_debate in [2, 4]:
             klass = DRAW_MANAGER_CLASSES[(teams_in_debate, round.draw_type)]
@@ -133,7 +138,7 @@ class BaseDrawManager:
             if team in tsas:
                 team.allocated_side = tsas[team]
 
-    def _make_debates(self, pairings: List['BasePairing']) -> None:
+    def _make_debates(self, pairings: List['BasePairing']) -> list[Debate]:
         random.shuffle(pairings)  # to avoid IDs indicating room ranks
 
         debates = {}
@@ -156,12 +161,15 @@ class BaseDrawManager:
 
         DebateTeam.objects.bulk_create(debateteams)
         logger.debug("Created %d debate teams", len(debateteams))
+        return list(debates.values())
 
-    def _make_bye_debates(self, byes: List['Team'], room_rank: int) -> None:
+    def _make_bye_debates(self, byes: List['Team'], room_rank: int) -> list[Debate]:
         """We'd want the room rank as to always show byes at the bottom"""
+        debates = []
         for i, bye in enumerate(byes, start=room_rank + 1):
             debate = Debate(round=self.round, bracket=-1, room_rank=i)
             debate.save()
+            debates.append(debate)
 
             dt = DebateTeam(debate=debate, team=bye, side=DebateSide.BYE)
             dt.save()
@@ -170,11 +178,12 @@ class BaseDrawManager:
                 bs = BallotSubmission(submitter_type=BallotSubmission.Submitter.AUTOMATION, confirmed=True, debate=debate)
                 bs.save()
                 TeamScore.objects.create(ballot_submission=bs, debate_team=dt, points=1, win=True)
+        return debates
 
     def delete(self):
         self.round.debate_set.all().delete()
 
-    def create(self):
+    def create(self, options: dict | None = None) -> list[Debate]:
         """Generates a draw and populates the database with it."""
 
         if self.round.draw_status != Round.Status.NONE:
@@ -182,9 +191,11 @@ class BaseDrawManager:
 
         self.delete()
 
-        options = dict()
+        if options is None:
+            options = dict()
         for key in self.get_relevant_options():
-            options[key] = self.round.tournament.preferences[OPTIONS_TO_CONFIG_MAPPING[key]]
+            if key not in options:
+                options[key] = self.round.tournament.preferences[OPTIONS_TO_CONFIG_MAPPING[key]]
         if options.get("side_allocations") == "manual-ballot":
             options["side_allocations"] = "balance"
 
@@ -201,12 +212,14 @@ class BaseDrawManager:
         drawer = DrawGenerator(self.teams_in_debate, generator_type, teams,
                 results=results, rrseq=rrseq, **options)
         pairings = drawer.generate()
-        self._make_debates(pairings)
+        debates = self._make_debates(pairings)
 
-        self._make_bye_debates(byes, max([p.room_rank for p in pairings], default=0))
+        debates.extend(self._make_bye_debates(byes, max([p.room_rank for p in pairings], default=0)))
 
         self.round.draw_status = Round.Status.DRAFT
         self.round.save()
+
+        return debates
 
 
 class RandomDrawManager(BaseDrawManager):
@@ -235,6 +248,7 @@ class PowerPairedDrawManager(BaseDrawManager):
             options.extend([
                 "avoid_conflicts", "odd_bracket", "pairing_method",
                 "pullup_restriction", "side_allocations",
+                "max_times_on_one_side", "pullup_penalty",
             ])
         elif self.teams_in_debate == 4:
             options.extend(["pullup", "position_cost", "assignment_method", "renyi_order", "exponent"])
@@ -311,6 +325,7 @@ class SeededDrawManager(BaseDrawManager):
 
         for team in teams:
             team.points = 0
+            team.subrank = team.seed + 1
 
         return teams, byes
 

@@ -3,7 +3,8 @@ from django.utils.translation import gettext_lazy as _
 from .common import BasePairDrawGenerator, DrawFatalError, DrawUserError, ManualDrawGenerator
 from .pairing import ResultPairing, BPEliminationResultPairing
 from .elimination import FirstEliminationDrawGenerator, SubsequentEliminationDrawGenerator
-from .powerpair import AustralsPowerPairedDrawGenerator, GraphPowerPairedDrawGenerator, AustralsPowerPairedWithAllocatedSidesDrawGenerator, GraphPowerPairedWithAllocatedSidesDrawGenerator
+from .powerpair import (AustralsPowerPairedDrawGenerator, AustralsPowerPairedWithAllocatedSidesDrawGenerator,
+    GraphPowerPairedDrawGenerator, GraphPowerPairedWithAllocatedSidesDrawGenerator, SingleGraphPowerPairedDrawGenerator)
 from .random import (RandomBPDrawGenerator, RandomPolyDrawGenerator, GraphRandomDrawGenerator,
     GraphRandomWithAllocatedSidesDrawGenerator, SwapRandomDrawGenerator, SwapRandomWithAllocatedSidesDrawGenerator)
 from .bphungarian import BPHungarianDrawGenerator
@@ -32,30 +33,27 @@ def get_two_team_generator(draw_type, avoid_conflicts='australs', side_allocatio
         return FirstEliminationDrawGenerator
     elif draw_type == "elimination":
         return SubsequentEliminationDrawGenerator
-    elif avoid_conflicts == 'graph':
+    elif avoid_conflicts.startswith('graph'):
         if draw_type == "random":
             if side_allocations == "preallocated":
                 return GraphRandomWithAllocatedSidesDrawGenerator
-            else:
-                return GraphRandomDrawGenerator
+            return GraphRandomDrawGenerator
         elif draw_type == "power_paired":
             if side_allocations == "preallocated":
                 return GraphPowerPairedWithAllocatedSidesDrawGenerator
-            else:
+            elif avoid_conflicts == 'graph':
                 return GraphPowerPairedDrawGenerator
+            return SingleGraphPowerPairedDrawGenerator
     else:
         if draw_type == "random":
             if side_allocations == "preallocated":
                 return SwapRandomWithAllocatedSidesDrawGenerator
-            else:
-                return SwapRandomDrawGenerator
+            return SwapRandomDrawGenerator
         elif draw_type == "power_paired":
             if side_allocations == "preallocated":
                 return AustralsPowerPairedWithAllocatedSidesDrawGenerator
-            else:
-                return AustralsPowerPairedDrawGenerator
-        else:
-            raise ValueError("Unrecognised draw type for two-team draw: {}".format(draw_type))
+            return AustralsPowerPairedDrawGenerator
+    raise ValueError("Unrecognised draw type for two-team draw: {}".format(draw_type))
 
 
 def get_bp_generator(draw_type):

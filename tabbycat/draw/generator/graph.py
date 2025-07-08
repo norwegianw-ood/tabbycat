@@ -1,9 +1,13 @@
 from collections import OrderedDict
+from typing import Optional, TYPE_CHECKING
 
 import munkres
 import networkx as nx
 
 from ..types import DebateSide
+
+if TYPE_CHECKING:
+    from participants.models import Team
 
 
 def sign(n: int) -> int:
@@ -19,7 +23,7 @@ class GraphGeneratorMixin:
         """Graph optimisation avoids conflicts, so method is extraneous."""
         pass
 
-    def assignment_cost(self, t1, t2, size, bracket=None):
+    def assignment_cost(self, t1, t2, size, bracket=None) -> Optional[int]:
         if t1 is t2:  # Same team
             return
 
@@ -34,6 +38,10 @@ class GraphGeneratorMixin:
             t1_affs, t1_negs = t1.side_history
             t2_affs, t2_negs = t2.side_history
 
+            if self.options["max_times_on_one_side"] > 0:
+                if max(t1_affs, t1_negs, t2_affs, t1_negs) > self.options["max_times_on_one_side"]:
+                    return None
+
             # Only declare an imbalance if both sides have been on the same side more often
             # Affs are positive, negs are negative. If teams have opposite signs, negative imbalance
             # gets reduced to 0. Equalities have no restriction on the side to be allocated so
@@ -44,9 +52,13 @@ class GraphGeneratorMixin:
             # This would prefer an imbalance of (+5 - +1) becoming (+4 - +2) rather than
             # (+5 - +4) becoming (+4 - +5), in a severe case.
             magnitude = (abs(t1_affs - t1_negs) + abs(t2_affs - t2_negs)) // 2
+
             penalty += imbalance * magnitude * self.options["side_penalty"]
 
         return penalty
+
+    def get_n_teams(self, teams: list['Team']) -> int:
+        return len(teams)
 
     def generate_pairings(self, brackets):
         """Creates an undirected weighted graph for each bracket and gets the minimum weight matching"""
@@ -56,18 +68,22 @@ class GraphGeneratorMixin:
         for j, (points, teams) in enumerate(brackets.items()):
             pairings[points] = []
             graph = nx.Graph()
-            n_teams = len(teams)
-            for t1 in teams:
-                for t2 in teams:
+            n_teams = self.get_n_teams(teams)
+            for k, t1 in enumerate(teams):
+                for t2 in teams[k+1:]:
                     penalty = self.assignment_cost(t1, t2, n_teams, j)
                     if penalty is not None:
                         graph.add_edge(t1, t2, weight=penalty)
 
-            for pairing in nx.min_weight_matching(graph):
+            # nx.nx_pydot.write_dot(graph, sys.stdout)
+            for pairing in sorted(nx.min_weight_matching(graph), key=lambda p: self.room_rank_ordering(p)):
                 i += 1
                 pairings[points].append(Pairing(teams=pairing, bracket=points, room_rank=i))
 
         return pairings
+
+    def room_rank_ordering(self, p):
+        return min([t.subrank for t in p if t.subrank is not None], default=0)
 
 
 class GraphAllocatedSidesMixin(GraphGeneratorMixin):

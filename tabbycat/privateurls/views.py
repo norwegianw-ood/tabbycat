@@ -3,7 +3,7 @@ from typing import Any, Dict, List, TYPE_CHECKING
 
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Exists, OuterRef, Q
+from django.db.models import Exists, OuterRef, Prefetch, Q
 from django.utils.text import format_lazy
 from django.utils.translation import gettext as _
 from django.utils.translation import ngettext
@@ -12,7 +12,7 @@ from checkins.models import PersonIdentifier
 from checkins.utils import get_unexpired_checkins
 from notifications.models import BulkNotification, SentMessage
 from notifications.views import RoleColumnMixin, TournamentTemplateEmailCreateView
-from participants.models import Adjudicator, Person, Speaker
+from participants.models import Adjudicator, Person, Speaker, SpeakerCategory
 from participants.tables import AdjudicatorDebateTable, TeamDebateTable
 from participants.views import BaseRecordView
 from tournaments.mixins import PersonalizablePublicTournamentPageMixin, SingleObjectByRandomisedUrlMixin, TournamentMixin
@@ -27,8 +27,9 @@ from .utils import populate_url_keys
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
-    from django.http.response import HttpResponseRedirect
     from django.http.request import HttpRequest
+    from django.http.response import HttpResponseRedirect
+
     from tournaments.models import Tournament
 
 logger = logging.getLogger(__name__)
@@ -152,8 +153,6 @@ class GenerateRandomisedUrlsView(AdministratorMixin, TournamentMixin, PostOnlyRe
 
 class EmailRandomisedUrlsView(RoleColumnMixin, TournamentTemplateEmailCreateView):
     page_subtitle = _("Private URLs")
-    view_permission = Permission.VIEW_PRIVATE_URLS_EMAIL_LIST
-    edit_permission = Permission.SEND_PRIVATE_URLS
     event = BulkNotification.EventType.URL
     subject_template = 'url_email_subject'
     message_template = 'url_email_message'
@@ -185,7 +184,7 @@ class EmailRandomisedUrlsView(RoleColumnMixin, TournamentTemplateEmailCreateView
 
 
 class PersonIndexView(SingleObjectByRandomisedUrlMixin, PersonalizablePublicTournamentPageMixin, VueTableTemplateView):
-    template_name = 'public_url_landing.html'
+    template_name = 'private_url_landing.html'
     model = Person
 
     slug_field = 'url_key'
@@ -198,7 +197,8 @@ class PersonIndexView(SingleObjectByRandomisedUrlMixin, PersonalizablePublicTour
 
     def get_queryset(self) -> 'QuerySet[Person]':
         return self.model.objects.filter(
-            Q(adjudicator__tournament=self.tournament) | Q(speaker__team__tournament=self.tournament))
+            Q(adjudicator__tournament=self.tournament) | Q(speaker__team__tournament=self.tournament)).prefetch_related(
+            Prefetch('speaker__categories', queryset=SpeakerCategory.objects.filter(public=True)))
 
     def get_table(self) -> TabbycatTableBuilder:
         if hasattr(self.object, 'adjudicator'):
@@ -227,7 +227,13 @@ class PersonIndexView(SingleObjectByRandomisedUrlMixin, PersonalizablePublicTour
         if hasattr(self.object, 'adjudicator'):
             kwargs['debateadjudications'] = BaseRecordView.allocations_set(self.object.adjudicator, False, self.tournament)
         else:
-            kwargs['debateteams'] = BaseRecordView.allocations_set(self.object.speaker.team, False, self.tournament)
+            team = self.object.speaker.team
+            kwargs['debateteams'] = BaseRecordView.allocations_set(team, False, self.tournament)
+
+            if invitation := team.invitation_set.first():
+                kwargs['speaker_invite_link'] = self.request.build_absolute_uri(
+                    reverse_tournament('reg-create-speaker', self.tournament, kwargs={'pk': team.pk}) + '?key=' + invitation.url_key,
+                )
 
         kwargs['draw_released'] = t.current_round.draw_status == Round.Status.RELEASED
         kwargs['feedback_pref'] = t.pref('participant_feedback') == 'private-urls'
