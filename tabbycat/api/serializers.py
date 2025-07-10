@@ -514,7 +514,7 @@ class SpeakerSerializer(serializers.ModelSerializer):
     )
     _links = SpeakerLinksSerializer(source='*', read_only=True)
     barcode = serializers.CharField(source='checkin_identifier.barcode', required=False, allow_null=True)
-    answers = fields.AnswerSerializer(many=True, source='get_answers', required=False)
+    answers = fields.AnswerSerializer(many=True, required=False)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -545,7 +545,7 @@ class SpeakerSerializer(serializers.ModelSerializer):
     def validate(self, data):
         allowed_cts = ContentType.objects.filter(Q(app_label='participants', model='speaker') | Q(app_label='participants', model='person'))
         required_questions = self.context['tournament'].question_set.filter(required=True, for_content_type_id__in=allowed_cts)
-        answers = data.get('get_answers', [])
+        answers = data.get('answers', [])
 
         if len(set(required_questions) - set(a['question'] for a in answers)) > 0:
             raise serializers.ValidationError("Answer to required question is missing")
@@ -555,7 +555,7 @@ class SpeakerSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         barcode = validated_data.pop('checkin_identifier', {}).get('barcode', None)
         url_key = validated_data.pop('url_key', None)
-        answers = validated_data.pop('get_answers', [])
+        answers = validated_data.pop('answers', [])
 
         if url_key is not None and len(url_key) != 0:  # Let an empty string be null for the uniqueness constraint
             validated_data['url_key'] = url_key
@@ -618,7 +618,7 @@ class AdjudicatorSerializer(serializers.ModelSerializer):
     venue_constraints = VenueConstraintSerializer(many=True, required=False)
     _links = AdjudicatorLinksSerializer(source='*', read_only=True)
     barcode = serializers.CharField(source='checkin_identifier.barcode', required=False, allow_null=True)
-    answers = fields.AnswerSerializer(many=True, source='get_answers', required=False)
+    answers = fields.AnswerSerializer(many=True, required=False)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -669,7 +669,7 @@ class AdjudicatorSerializer(serializers.ModelSerializer):
     def validate(self, data):
         allowed_cts = ContentType.objects.filter(Q(app_label='participants', model='adjudicator') | Q(app_label='participants', model='person'))
         required_questions = self.context['tournament'].question_set.filter(required=True, for_content_type_id__in=allowed_cts)
-        answers = data.get('get_answers', [])
+        answers = data.get('answers', [])
 
         if len(set(required_questions) - set(a['question'] for a in answers)) > 0:
             raise serializers.ValidationError("Answer to required question is missing")
@@ -680,7 +680,7 @@ class AdjudicatorSerializer(serializers.ModelSerializer):
         venue_constraints = validated_data.pop('venue_constraints', [])
         barcode = validated_data.pop('checkin_identifier', {}).get('barcode', None)
         url_key = validated_data.pop('url_key', None)
-        answers = validated_data.pop('get_answers', [])
+        answers = validated_data.pop('answers', [])
 
         if url_key is not None and len(url_key) != 0:  # Let an empty string be null for the uniqueness constraint
             validated_data['url_key'] = url_key
@@ -758,7 +758,7 @@ class TeamSerializer(serializers.ModelSerializer):
     )
 
     venue_constraints = VenueConstraintSerializer(many=True, required=False)
-    answers = fields.AnswerSerializer(many=True, source='get_answers', required=False)
+    answers = fields.AnswerSerializer(many=True, required=False)
 
     class Meta:
         model = Team
@@ -804,7 +804,7 @@ class TeamSerializer(serializers.ModelSerializer):
 
         allowed_cts = ContentType.objects.filter(Q(app_label='participants', model='team'))
         required_questions = self.context['tournament'].question_set.filter(required=True, for_content_type_id__in=allowed_cts)
-        answers = data.get('get_answers', [])
+        answers = data.get('answers', [])
 
         if len(set(required_questions) - set(a['question'] for a in answers)) > 0:
             raise serializers.ValidationError("Answer to required question is missing")
@@ -832,7 +832,7 @@ class TeamSerializer(serializers.ModelSerializer):
         speakers_data = validated_data.pop('speakers', [])
         break_categories = validated_data.pop('break_categories', [])
         venue_constraints = validated_data.pop('venue_constraints', [])
-        answers = validated_data.pop('get_answers', [])
+        answers = validated_data.pop('answers', [])
 
         emoji, code_name = pick_unused_emoji(validated_data['tournament'].id)
         if 'emoji' not in validated_data or validated_data.get('emoji') is None:
@@ -1217,7 +1217,7 @@ class FeedbackSerializer(serializers.ModelSerializer):
     source = SubmitterSourceField(source='*')
     participant_submitter = fields.ParticipantSourceField(allow_null=True, required=False)
     debate = DebateHyperlinkedRelatedField(view_name='api-pairing-detail', queryset=Debate.objects.all(), lookup_url_kwarg='debate_pk')
-    answers = fields.AdjAnswerSerializer(many=True, source='get_answers', required=False)
+    answers = fields.AdjAnswerSerializer(many=True, required=False)
 
     class Meta:
         model = AdjudicatorFeedback
@@ -1238,7 +1238,7 @@ class FeedbackSerializer(serializers.ModelSerializer):
 
         source_type = 'from_team' if isinstance(source, Team) else 'from_adj'
         required_questions = AdjudicatorFeedbackQuestion.objects.filter(tournament=self.context['tournament'], required=True, **{source_type: True})
-        answers = data.get('get_answers', [])
+        answers = data.get('answers', [])
 
         if len(set(required_questions) - set(a['question'] for a in answers)) > 0:
             raise serializers.ValidationError("Answer to required question is missing")
@@ -1277,7 +1277,7 @@ class FeedbackSerializer(serializers.ModelSerializer):
         }
 
     def create(self, validated_data):
-        answers = validated_data.pop('get_answers', [])
+        answers = validated_data.pop('answers', [])
 
         validated_data.update(self.get_submitter_fields())
         if validated_data.get('confirmed', False):

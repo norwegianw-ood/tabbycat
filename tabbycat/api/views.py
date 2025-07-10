@@ -366,14 +366,6 @@ class InstitutionViewSet(TournamentAPIMixin, TournamentPublicAPIMixin, ModelView
         if self.request.query_params.get('region'):
             filters &= Q(region__name=self.request.query_params['region'])
 
-        answers_prefetch = [
-            Prefetch(
-                typ,
-                queryset=getattr(self.model, typ).rel.model.objects.select_related('question__tournament'),
-            )
-            for typ in self.model.answer_rels
-        ]
-
         return Institution.objects.filter(
             Q(adjudicator__tournament=self.tournament) | Q(team__tournament=self.tournament),
             filters,
@@ -381,7 +373,7 @@ class InstitutionViewSet(TournamentAPIMixin, TournamentPublicAPIMixin, ModelView
             Prefetch('team_set', queryset=self.tournament.team_set.all()),
             Prefetch('adjudicator_set', queryset=self.tournament.adjudicator_set.all()),
             'venue_constraints__category__tournament',
-            *answers_prefetch,
+            'answers__question__tournament',
         )
 
 
@@ -406,21 +398,6 @@ class TeamViewSet(TournamentAPIMixin, TournamentPublicAPIMixin, ModelViewSet):
     destroy_permission = Permission.ADD_TEAMS
 
     def get_queryset(self):
-        team_answers_prefetch = [
-            Prefetch(
-                typ,
-                queryset=getattr(self.model, typ).rel.model.objects.select_related('question__tournament'),
-            )
-            for typ in self.model.answer_rels
-        ]
-        spk_answers_prefetch = [
-            Prefetch(
-                typ,
-                queryset=getattr(Speaker, typ).rel.model.objects.select_related('question__tournament'),
-            )
-            for typ in Speaker.answer_rels
-        ]
-
         category_prefetch = Prefetch('categories', queryset=SpeakerCategory.objects.all().select_related('tournament'))
         if not self.request.user or not self.request.user.is_staff:
             category_prefetch.queryset = category_prefetch.queryset.filter(public=True)
@@ -428,9 +405,9 @@ class TeamViewSet(TournamentAPIMixin, TournamentPublicAPIMixin, ModelViewSet):
         return super().get_queryset().select_related('tournament').prefetch_related(
             Prefetch(
                 'speaker_set',
-                queryset=Speaker.objects.all().prefetch_related(category_prefetch, *spk_answers_prefetch).select_related('team__tournament', 'checkin_identifier'),
+                queryset=Speaker.objects.all().prefetch_related('answers__question__tournament', category_prefetch).select_related('team__tournament', 'checkin_identifier'),
             ),
-            *team_answers_prefetch,
+            'answers__question__tournament',
             'institution_conflicts', 'venue_constraints__category__tournament',
             'break_categories', 'break_categories__tournament',
         )
@@ -466,19 +443,11 @@ class AdjudicatorViewSet(TournamentAPIMixin, TournamentPublicAPIMixin, ModelView
         if self.request.query_params.get('break') and self.get_break_permission():
             filters &= Q(breaking=True)
 
-        answers_prefetch = [
-            Prefetch(
-                typ,
-                queryset=getattr(self.model, typ).rel.model.objects.select_related('question__tournament'),
-            )
-            for typ in self.model.answer_rels
-        ]
-
         return super().get_queryset().select_related('checkin_identifier').prefetch_related(
             'team_conflicts', 'team_conflicts__tournament',
             'adjudicator_conflicts', 'adjudicator_conflicts__tournament',
             'institution_conflicts', 'venue_constraints__category__tournament',
-            *answers_prefetch,
+            'answers__question__tournament',
         ).filter(filters)
 
 
@@ -538,18 +507,10 @@ class SpeakerViewSet(TournamentAPIMixin, TournamentPublicAPIMixin, ModelViewSet)
     def get_queryset(self):
         category_prefetch = Prefetch('categories', queryset=SpeakerCategory.objects.all().select_related('tournament'))
 
-        answers_prefetch = [
-            Prefetch(
-                typ,
-                queryset=getattr(self.model, typ).rel.model.objects.select_related('question__tournament'),
-            )
-            for typ in self.model.answer_rels
-        ]
-
         if not self.request.user or not self.request.user.is_staff:
             category_prefetch.queryset = category_prefetch.queryset.filter(public=True)
 
-        return super().get_queryset().select_related('checkin_identifier').prefetch_related(category_prefetch, *answers_prefetch)
+        return super().get_queryset().select_related('checkin_identifier').prefetch_related('answers__question__tournament', category_prefetch)
 
 
 @extend_schema(tags=['venues'], parameters=[tournament_parameter])
@@ -1259,13 +1220,6 @@ class FeedbackViewSet(TournamentAPIMixin, AdministratorAPIMixin, ModelViewSet):
         if query_params.get('target'):
             filters &= Q(adjudicator_id=query_params.get('target'))
 
-        answers_prefetch = [
-            Prefetch(
-                typ,
-                queryset=getattr(self.model, typ).rel.model.objects.select_related('question__tournament'),
-            )
-            for typ in self.model.answer_rels
-        ]
         return super().get_queryset().filter(filters).select_related(
             'adjudicator', 'adjudicator__tournament',
             'source_adjudicator', 'source_team', 'source_team__team',
@@ -1274,7 +1228,7 @@ class FeedbackViewSet(TournamentAPIMixin, AdministratorAPIMixin, ModelViewSet):
             'source_adjudicator__debate__round', 'source_team__debate__round',
             'source_adjudicator__debate__round__tournament', 'source_team__debate__round__tournament',
             'participant_submitter__adjudicator__tournament', 'participant_submitter__speaker__team__tournament',
-        ).prefetch_related(*answers_prefetch)
+        ).prefetch_related('answers__question__tournament')
 
 
 @extend_schema(tags=['availabilities'], parameters=round_parameters)
