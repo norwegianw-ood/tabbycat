@@ -684,7 +684,7 @@ class PersonCheckinMixin:
 
     def get_queryset(self):
         p_filter = Q()
-        if self.participant_requester.id is not None:
+        if self.participant_requester is not None:
             p_filter &= Q(id=self.participant_requester.id)
         return super().get_queryset().filter(p_filter)
 
