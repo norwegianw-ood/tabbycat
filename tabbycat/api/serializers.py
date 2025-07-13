@@ -27,7 +27,7 @@ from participants.emoji import pick_unused_emoji
 from participants.models import Adjudicator, Institution, Person, Region, Speaker, SpeakerCategory, Team
 from participants.utils import populate_code_names
 from privateurls.utils import populate_url_keys
-from registration.models import Answer, Question
+from registration.models import Question
 from results.models import BallotSubmission, ScoreCriterion, SpeakerScore, Submission, TeamScore
 from results.result import DebateResult, ResultError
 from standings.speakers import SpeakerStandingsGenerator
@@ -571,18 +571,12 @@ class SpeakerSerializer(serializers.ModelSerializer):
         if validated_data.get('code_name') is None:
             populate_code_names([speaker])
 
-        # Create answers
-        for answer in answers:
-            question = answer['question']
-            obj = Answer(question=question, content_object=speaker, answer=answer['answer'])
-            try:
-                obj.save()
-            except TypeError as e:
-                raise serializers.ValidationError(e)
+        save_related(fields.AnswerSerializer, answers, self.context, {'content_object': speaker})
 
         return speaker
 
     def update(self, instance, validated_data):
+        save_related(fields.AnswerSerializer, validated_data.pop('answers', []), self.context, {'content_object': instance})
         handle_update_barcode(instance, validated_data)
         return super().update(instance, validated_data)
 
@@ -701,19 +695,13 @@ class AdjudicatorSerializer(serializers.ModelSerializer):
         if adj.institution is not None:
             adj.adjudicatorinstitutionconflict_set.get_or_create(institution=adj.institution)
 
-        # Create answers
-        for answer in answers:
-            question = answer['question']
-            obj = Answer(question=question, content_object=adj, answer=answer['answer'])
-            try:
-                obj.save()
-            except TypeError as e:
-                raise serializers.ValidationError(e)
+        save_related(fields.AnswerSerializer, answers, self.context, {'content_object': adj})
 
         return adj
 
     def update(self, instance, validated_data):
         save_related(VenueConstraintSerializer, validated_data.pop('venue_constraints', []), self.context, {'subject': instance})
+        save_related(fields.AnswerSerializer, validated_data.pop('answers', []), self.context, {'content_object': instance})
         handle_update_barcode(instance, validated_data)
 
         if 'base_score' in validated_data and validated_data['base_score'] != instance.base_score:
@@ -853,24 +841,17 @@ class TeamSerializer(serializers.ModelSerializer):
         # The data is passed to the sub-serializer so that it handles categories
         save_related(SpeakerSerializer, speakers_data, self.context, {'team': team})
         save_related(VenueConstraintSerializer, venue_constraints, self.context, {'subject': team})
+        save_related(fields.AnswerSerializer, answers, self.context, {'content_object': team})
 
         if team.institution is not None:
             team.teaminstitutionconflict_set.get_or_create(institution=team.institution)
-
-        # Create answers
-        for answer in answers:
-            question = answer['question']
-            obj = Answer(question=question, content_object=team, answer=answer['answer'])
-            try:
-                obj.save()
-            except TypeError as e:
-                raise serializers.ValidationError(e)
 
         return team
 
     def update(self, instance, validated_data):
         save_related(SpeakerSerializer, validated_data.pop('speakers', []), self.context, {'team': instance})
         save_related(VenueConstraintSerializer, validated_data.pop('venue_constraints', []), self.context, {'subject': instance})
+        save_related(fields.AnswerSerializer, validated_data.pop('answers', []), self.context, {'content_object': instance})
 
         if self.partial:
             # Avoid removing conflicts if merely PATCHing
@@ -1287,13 +1268,7 @@ class FeedbackSerializer(serializers.ModelSerializer):
         feedback = super().create(validated_data)
 
         # Create answers
-        for answer in answers:
-            question = answer['question']
-            obj = Answer(question=question, content_object=feedback, answer=answer['answer'])
-            try:
-                obj.save()
-            except TypeError as e:
-                raise serializers.ValidationError(e)
+        save_related(fields.AdjAnswerSerializer, answers, self.context, {'content_object': feedback})
 
         return feedback
 
