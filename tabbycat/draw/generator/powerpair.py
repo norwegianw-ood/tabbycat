@@ -352,6 +352,9 @@ class GraphCostMixin:
                     else:
                         team.subrank = i
 
+    def room_rank_ordering(self, p):
+        return min([t.subrank for t in p if t.subrank is not None], default=0)
+
 
 class AustralsPairingMixin:
 
