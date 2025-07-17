@@ -144,7 +144,7 @@ class BaseCreateTeamFormView(LogActionMixin, PublicTournamentPageMixin, CustomQu
         return form
 
     def get_page_subtitle(self):
-        if self.steps.current == 'team' and hasattr(self, 'institution'):
+        if self.steps.current == 'team' and getattr(self, 'institution', None) is not None:
             return _("from %s") % self.institution.name
         elif self.steps.current == 'speaker':
             team_form = self.get_team_form()
@@ -291,7 +291,7 @@ class BaseCreateAdjudicatorFormView(LogActionMixin, PublicTournamentPageMixin, C
     action_log_type = ActionLogEntry.ActionType.ADJUDICATOR_REGISTER
 
     def get_page_subtitle(self):
-        if hasattr(self, 'institution'):
+        if getattr(self, 'institution', None) is not None:
             return _("from %s") % self.institution.name
         return ''
 

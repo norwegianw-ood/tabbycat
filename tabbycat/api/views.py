@@ -775,6 +775,10 @@ class BaseStandingsView(TournamentAPIMixin, TournamentPublicAPIMixin, GenericAPI
             return Round.objects.get(tournament=self.tournament, seq=int(self.request.query_params.get('round')))
         return Round.objects.filter(tournament=self.tournament).order_by('seq').last()
 
+    @property
+    def generator_kwargs(self):
+        return {}
+
     @extend_schema(tags=['standings'], parameters=[
         tournament_parameter,
         OpenApiParameter('category', description='Only include participants in a category (ID)', required=False, type=int),
@@ -783,7 +787,7 @@ class BaseStandingsView(TournamentAPIMixin, TournamentPublicAPIMixin, GenericAPI
     def get(self, request, **kwargs):
         """Get current standings"""
         metrics, extra_metrics = self.get_metrics()
-        generator = self.generator(metrics, ('rank',), extra_metrics)
+        generator = self.generator(metrics, ('rank',), extra_metrics, **self.generator_kwargs)
         standings = generator.generate(self.get_queryset(), round=self.get_max_round())
         serializer = self.get_serializer(iter(standings), many=True)
         return Response(serializer.data)
@@ -802,7 +806,10 @@ class SubstantiveSpeakerStandingsView(BaseStandingsView):
     access_preference = 'speaker_tab_released'
     model = Speaker
     tournament_field = 'team__tournament'
+
     generator = SpeakerStandingsGenerator
+    missable_preference = 'standings_missed_debates'
+    missable_field = 'count'
 
     list_permission = Permission.VIEW_SPEAKERSSTANDINGS
 
@@ -812,11 +819,23 @@ class SubstantiveSpeakerStandingsView(BaseStandingsView):
             return super().get_queryset().filter(categories__pk=category)
         return super().get_queryset()
 
+    @property
+    def generator_kwargs(self):
+        missable = -1 if self.missable_preference is None else self.tournament.pref(self.missable_preference)
+        if missable < 0:
+            return None, None  # no limit
+        total_prelim_rounds = self.tournament.round_set.filter(
+            stage=Round.Stage.PRELIMINARY).count()
+        return {'rank_filter': (self.missable_field, total_prelim_rounds - missable)}
+
 
 @extend_schema_view(
     get=extend_schema(summary="Get reply speaker standings", responses=serializers.SpeakerStandingsSerializer(many=True)),
 )
 class ReplySpeakerStandingsView(SubstantiveSpeakerStandingsView):
+    missable_preference = 'standings_missed_replies'
+    missable_field = 'replies_count'
+
     def get_metrics(self):
         return ('replies_avg',), ('replies_stddev', 'replies_count')
 

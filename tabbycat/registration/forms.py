@@ -109,6 +109,13 @@ class TeamForm(CustomQuestionsFormMixin, forms.ModelForm):
                 (3, _("Full seed")),
             ), help_text=self.fields['seed'].help_text)
 
+        if 'break_categories' in self.fields:
+            bcs = self.tournament.breakcategory_set.exclude(is_general=True)
+            if len(bcs) == 0:
+                self.fields.pop('break_categories')
+            else:
+                self.fields['break_categories'].queryset = bcs
+
         self.add_question_fields()
 
     class Meta:
