@@ -219,15 +219,18 @@ class DrawStrengthByRankMetricAnnotator(BaseMetricAnnotator):
 
         logger.info("Running opponents query for rank draw strength:")
 
+        team_filter = Q()
         # Make a copy of teams queryset and annotate with opponents
         opponents_filter = ~Q(debateteam__debate__debateteam__team_id=F('id'))
         opponents_filter &= Q(debateteam__debate__round__stage=Round.Stage.PRELIMINARY)
         if round is not None:
             opponents_filter &= Q(debateteam__debate__round__seq__lte=round.seq)
+            team_filter &= Q(tournament=round.tournament)
+
         opponents_annotation = ArrayAgg('debateteam__debate__debateteam__team_id',
                 filter=opponents_filter)
         logger.info("Opponents annotation: %s", str(opponents_annotation))
-        teams_with_opponents = queryset.model.objects.annotate(opponent_ids=opponents_annotation)
+        teams_with_opponents = queryset.model.objects.filter(team_filter).annotate(opponent_ids=opponents_annotation)
         opponents_by_team = {team.id: team.opponent_ids or [] for team in teams_with_opponents}
         teams_by_id = {team.id: team for team in teams_with_opponents}
 
