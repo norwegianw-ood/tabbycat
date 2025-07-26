@@ -1,6 +1,7 @@
 """Standings generator for teams."""
 
 import logging
+from statistics import mean
 
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import Avg, Count, F, FloatField, PositiveIntegerField, Q, StdDev, Sum
@@ -232,9 +233,12 @@ class DrawStrengthByRankMetricAnnotator(BaseMetricAnnotator):
         teams_by_id = {team.id: team for team in teams_with_opponents}
 
         for team in queryset:
-            ranks = [standings.infos[teams_by_id[opponent_id]].rankings['rank'][0] for opponent_id in opponents_by_team[team.id]]
+            ranks = []
+            for opponent_id in opponents_by_team[team.id]:
+                if opponent := standings.infos.get(teams_by_id[opponent_id]):
+                    ranks.append(opponent.rankings['rank'][0])
             ranks_without_none = [rank for rank in ranks if rank is not None]
-            standings.add_metric(team, self.key, sum(ranks_without_none))
+            standings.add_metric(team, self.key, mean(ranks_without_none))
 
 
 class DrawStrengthByWinsMetricAnnotator(BaseDrawStrengthMetricAnnotator):
