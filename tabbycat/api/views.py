@@ -823,7 +823,7 @@ class SubstantiveSpeakerStandingsView(BaseStandingsView):
     def generator_kwargs(self):
         missable = -1 if self.missable_preference is None else self.tournament.pref(self.missable_preference)
         if missable < 0:
-            return None, None  # no limit
+            return {}
         total_prelim_rounds = self.tournament.round_set.filter(
             stage=Round.Stage.PRELIMINARY).count()
         return {'rank_filter': (self.missable_field, total_prelim_rounds - missable)}
