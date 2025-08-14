@@ -39,6 +39,7 @@ from standings.teams import TeamStandingsGenerator
 from tournaments.mixins import TournamentFromUrlMixin
 from tournaments.models import Round, Tournament
 from users.permissions import get_permissions, Permission
+from users.permissions import has_permission as user_has_permission
 from venues.models import Venue, VenueCategory
 
 from . import serializers
@@ -129,7 +130,7 @@ class TournamentViewSet(PublicAPIMixin, APILogActionMixin, ModelViewSet):
     partial_update=extend_schema(summary="Patch tournament preference"),
     bulk=extend_schema(summary="Update multiple tournament preferences"),
 )
-class TournamentPreferenceViewSet(TournamentFromUrlMixin, AdministratorAPIMixin, APILogActionMixin, PerInstancePreferenceViewSet):
+class TournamentPreferenceViewSet(TournamentFromUrlMixin, PublicAPIMixin, APILogActionMixin, PerInstancePreferenceViewSet):
     """
     """
     # Blank comment to avoid comment from TournamentFromUrlMixin appearing.
@@ -144,6 +145,12 @@ class TournamentPreferenceViewSet(TournamentFromUrlMixin, AdministratorAPIMixin,
 
     def get_related_instance(self):
         return self.tournament
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if not user_has_permission(self.request.user, self.list_permission, self.tournament):
+            return [pref for pref in qs if not getattr(pref.preference, 'sensitive', False)]
+        return qs
 
 
 @extend_schema(tags=['rounds'])
