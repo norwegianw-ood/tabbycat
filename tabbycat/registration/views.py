@@ -598,7 +598,7 @@ class CustomQuestionFormsetView(TournamentMixin, AdministratorMixin, ModelFormSe
         return _("for %s") % self.question_model._meta.verbose_name_plural
 
     def get_formset_queryset(self):
-        return super().get_formset_queryset().filter(for_content_type=ContentType.objects.get_for_model(self.question_model)).order_by('seq')
+        return super().get_formset_queryset().filter(tournament=self.tournament, for_content_type=ContentType.objects.get_for_model(self.question_model)).order_by('seq')
 
     def formset_valid(self, formset):
         self.instances = formset.save(commit=False)

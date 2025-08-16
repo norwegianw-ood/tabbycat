@@ -820,7 +820,10 @@ class AdjudicatorPrivateUrlBallotScoresheetView(RoundMixin, SingleObjectByRandom
             return 404, _("There is no result yet for debate %s.") % self.matchup_description()
 
     def get_context_data(self, **kwargs):
-        ballot = self.object.ballotsubmission_set.filter(discarded=False).order_by('version').last()
+        ballot = self.object.ballotsubmission_set.filter(
+            Q(participant_submitter__isnull=True) | Q(participant_submitter__url_key=self.kwargs.get('url_key')),
+            discarded=False,
+        ).order_by('confirmed', 'version').last()
         kwargs['motion'] = ballot.motion
         kwargs['result'] = ballot.result
         kwargs['use_code_names'] = use_team_code_names(self.tournament, False)
