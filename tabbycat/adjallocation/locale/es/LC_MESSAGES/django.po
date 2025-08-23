@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: tabbycat\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2023-01-28 12:44-0400\n"
-"PO-Revision-Date: 2025-08-23 03:21\n"
+"PO-Revision-Date: 2025-08-23 04:39\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -250,11 +250,11 @@ msgstr "Número secuencial de panel, no utilizado en ningún algoritmo"
 
 #: adjallocation/models.py
 msgid "liveness"
-msgstr "vida"
+msgstr "vitalidad"
 
 #: adjallocation/models.py
 msgid "Number of categories this room is expected to be live for"
-msgstr "Número de categorías para las que se espera que esta habitación esté en vivo"
+msgstr "Número de categorías para las que se espera que esta sala esté en viva"
 
 #: adjallocation/models.py
 msgid "preformed panel"
