@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: tabbycat\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2023-01-28 12:44-0400\n"
-"PO-Revision-Date: 2025-08-23 02:17\n"
+"PO-Revision-Date: 2025-08-23 03:21\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -234,11 +234,11 @@ msgstr "Estimación de la llave más baja para la cual este panel puede ser"
 
 #: adjallocation/models.py
 msgid "maximum bracket"
-msgstr "corchete máximo"
+msgstr "llave máxima"
 
 #: adjallocation/models.py
 msgid "Estimate of the highest bracket for which this panel might be"
-msgstr "Estimación del brazalete más alto para el cual este panel puede ser"
+msgstr "Estimación de la llave más alta para la cual este panel puede ser"
 
 #: adjallocation/models.py
 msgid "room rank"
