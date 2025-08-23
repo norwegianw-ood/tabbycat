@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: tabbycat\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2023-01-28 12:44-0400\n"
-"PO-Revision-Date: 2025-08-23 18:39\n"
+"PO-Revision-Date: 2025-08-23 22:47\n"
 "Last-Translator: \n"
 "Language-Team: Spanish\n"
 "Language: es_ES\n"
@@ -290,12 +290,12 @@ msgstr "Un panel preformado es un grupo definido de jueces que se especifica par
 
 #: adjallocation/templates/preformed_index.html
 msgid "Note that only adjudicators who have been marked as 'available' for that round will be able to be allocated for that round, so you may need to set their availability in advance."
-msgstr "Ten en cuenta que sólo los jueces que hayan sido marcados como \"disponibles\" para esa ronda podrán ser asignados para esa ronda, así que puede que necesite establecer su disponibilidad con antelación."
+msgstr "Ten en cuenta que solo las personas juezas que hayan sido marcadas como disponibles para esa ronda podrán ser asignadas para esa ronda, así que puede que necesites establecer su disponibilidad con antelación."
 
 #: adjallocation/templates/preformed_index.html
 #, python-format
 msgid "Edit Preformed Panels for %(round)s"
-msgstr "Editar paneles prereformados para %(round)s"
+msgstr "Editar paneles preformados para %(round)s"
 
 #: adjallocation/utils.py
 #, python-format
@@ -305,7 +305,7 @@ msgstr "Conflicto: <strong>%(adjudicator)s</strong> y <strong>%(team)s</strong> 
 #: adjallocation/utils.py
 #, python-format
 msgid "Conflict: <strong>%(adjudicator)s</strong> & <strong>%(team)s</strong> via institution <strong>%(institution)s</strong>"
-msgstr "Conflicto: <strong>%(adjudicator)s</strong> & <strong>%(team)s</strong> a través de la institución <strong>%(institution)s</strong>"
+msgstr "Conflicto: <strong>%(adjudicator)s</strong> & <strong>%(team)s</strong> vía institución <strong>%(institution)s</strong>"
 
 #: adjallocation/utils.py
 #, python-format
@@ -315,7 +315,7 @@ msgstr "Conflicto: <strong>%(adjudicator1)s</strong> y <strong>%(adjudicator2)s<
 #: adjallocation/utils.py
 #, python-format
 msgid "Conflict: <strong>%(adjudicator1)s</strong> & <strong>%(adjudicator2)s</strong> via institution <strong>%(institution)s</strong>"
-msgstr "Conflicto: <strong>%(adjudicator1)s</strong> & <strong>%(adjudicator2)s</strong> a través de la institución <strong>%(institution)s</strong>"
+msgstr "Conflicto: <strong>%(adjudicator1)s</strong> & <strong>%(adjudicator2)s</strong> vía institución <strong>%(institution)s</strong>"
 
 #: adjallocation/views.py
 msgid "Male"
@@ -335,11 +335,11 @@ msgstr "Desconocido"
 
 #: adjallocation/views.py
 msgid "Edit Allocation"
-msgstr "Editar adjudicación"
+msgstr "Editar Asignación"
 
 #: adjallocation/views.py
 msgid "Edit Panels"
-msgstr "Editar paneles"
+msgstr "Editar Paneles"
 
 #: adjallocation/views.py
 msgid "Return to Panels Overview"
