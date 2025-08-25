@@ -1,6 +1,6 @@
 from split_settings.tools import optional, include
 
 include(
-    "base.py",
-    optional("local.py"),   # won't crash if missing
+    "settings/base.py",
+    optional("settings/local.py"),
 )
