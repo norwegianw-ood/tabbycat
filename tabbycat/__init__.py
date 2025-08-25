@@ -1,8 +1,1 @@
-from split_settings.tools import include, optional
-
-include(
-    "base.py",
-    optional("local.py"),
-    "production.py",
-    "logging.py",
-)
+from .core import *
